@@ -1,0 +1,1730 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>家の在庫管理</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&display=swap');
+
+    :root {
+      --bg:        #080c14;
+      --surface:   rgba(12, 20, 36, 0.85);
+      --border:    rgba(0, 200, 255, 0.18);
+      --accent:    #00c8ff;
+      --accent2:   #0af0b0;
+      --danger:    #ff3f5e;
+      --warn-bg:   rgba(255, 63, 94, 0.08);
+      --text:      #d0e8f5;
+      --muted:     #4a6070;
+      --header-h:  58px;
+      --tab-h:     46px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', 'Rajdhani', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      background-image:
+        linear-gradient(rgba(0,200,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,200,255,0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+
+    /* ヘッダー */
+    header {
+      background: rgba(4, 10, 22, 0.95);
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+      padding: 0 20px;
+      height: var(--header-h);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 0 24px rgba(0,200,255,0.08);
+    }
+    header h1 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: var(--accent);
+      text-shadow: 0 0 12px rgba(0,200,255,0.5);
+    }
+    .low-stock-badge {
+      background: var(--danger);
+      color: white;
+      border-radius: 50%;
+      width: 22px;
+      height: 22px;
+      font-size: 0.7rem;
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 10px rgba(255,63,94,0.6);
+      animation: pulse-red 2s infinite;
+    }
+    .low-stock-badge.hidden { display: none; }
+    @keyframes pulse-red {
+      0%, 100% { box-shadow: 0 0 6px rgba(255,63,94,0.5); }
+      50%       { box-shadow: 0 0 14px rgba(255,63,94,0.9); }
+    }
+
+    /* タブ */
+    .tabs {
+      display: flex;
+      background: rgba(4, 10, 22, 0.92);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: var(--header-h);
+      z-index: 99;
+      height: var(--tab-h);
+    }
+    .tab {
+      flex: 1;
+      height: 100%;
+      text-align: center;
+      font-size: 0.78rem;
+      cursor: pointer;
+      border: none;
+      background: none;
+      color: var(--muted);
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      transition: all 0.2s;
+      position: relative;
+      font-family: inherit;
+    }
+    .tab::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 20%; right: 20%;
+      height: 2px;
+      background: var(--accent);
+      opacity: 0;
+      transition: opacity 0.2s;
+      box-shadow: 0 0 8px var(--accent);
+    }
+    .tab.active { color: var(--accent); }
+    .tab.active::after { opacity: 1; }
+    .tab:hover:not(.active) { color: var(--text); }
+
+    /* メイン */
+    main { padding: 16px; max-width: 600px; margin: 0 auto; }
+
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    /* セクションカード */
+    .section-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 14px;
+      overflow: hidden;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 2px 16px rgba(0,0,0,0.4), inset 0 1px 0 rgba(0,200,255,0.06);
+    }
+    .section-header {
+      background: rgba(0,200,255,0.05);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 16px;
+      font-weight: 700;
+      font-size: 0.88rem;
+      color: var(--accent);
+      letter-spacing: 0.06em;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.15s;
+    }
+    .section-header:hover { background: rgba(0,200,255,0.09); }
+    .section-header .arrow { transition: transform 0.2s; font-size: 0.7rem; opacity: 0.6; }
+    .section-header.collapsed .arrow { transform: rotate(-90deg); }
+    .section-body.collapsed { display: none; }
+
+    /* アイテム行 */
+    .item-row {
+      padding: 11px 16px;
+      display: flex;
+      align-items: center;
+      border-bottom: 1px solid rgba(0,200,255,0.07);
+      gap: 10px;
+      transition: background 0.15s;
+    }
+    .item-row:last-child { border-bottom: none; }
+    .item-row:hover { background: rgba(0,200,255,0.04); }
+    .item-row.low {
+      background: var(--warn-bg);
+      border-left: 2px solid var(--danger);
+    }
+    .item-row.low:hover { background: rgba(255,63,94,0.12); }
+
+    .item-name { flex: 1; font-size: 0.92rem; color: var(--text); }
+    .item-name .low-label {
+      display: inline-block;
+      background: var(--danger);
+      color: white;
+      font-size: 0.6rem;
+      padding: 1px 5px;
+      border-radius: 3px;
+      margin-left: 6px;
+      vertical-align: middle;
+      letter-spacing: 0.05em;
+      box-shadow: 0 0 6px rgba(255,63,94,0.5);
+    }
+    .item-location {
+      font-size: 0.7rem;
+      color: var(--muted);
+      margin-top: 3px;
+      letter-spacing: 0.03em;
+    }
+
+    /* カウンター */
+    .counter { display: flex; align-items: center; gap: 6px; }
+    .counter button {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      border: 1px solid var(--accent);
+      background: transparent;
+      color: var(--accent);
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+    }
+    .counter button:hover {
+      background: var(--accent);
+      color: var(--bg);
+      box-shadow: 0 0 10px rgba(0,200,255,0.5);
+    }
+    .counter button:disabled {
+      border-color: var(--muted);
+      color: var(--muted);
+      cursor: not-allowed;
+    }
+    .counter button:disabled:hover { background: transparent; box-shadow: none; }
+    .count-display {
+      min-width: 32px;
+      text-align: center;
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--accent2);
+      font-family: 'Rajdhani', 'Hiragino Kaku Gothic ProN', monospace;
+    }
+    .count-display.low {
+      color: var(--danger);
+      text-shadow: 0 0 8px rgba(255,63,94,0.5);
+    }
+
+    .item-actions { display: flex; gap: 3px; }
+    .btn-icon {
+      width: 26px;
+      height: 26px;
+      border: none;
+      background: none;
+      cursor: pointer;
+      font-size: 0.9rem;
+      border-radius: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s;
+      opacity: 0.5;
+    }
+    .btn-icon:hover { background: rgba(255,255,255,0.08); opacity: 1; }
+
+    /* 買い物リスト空状態 */
+    .shopping-empty {
+      text-align: center;
+      color: var(--muted);
+      padding: 50px 20px;
+      font-size: 0.9rem;
+    }
+    .shopping-empty .icon { font-size: 3rem; display: block; margin-bottom: 12px; }
+
+    /* FABボタン */
+    .fab {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      width: 52px;
+      height: 52px;
+      border-radius: 10px;
+      background: var(--accent);
+      color: var(--bg);
+      font-size: 1.6rem;
+      font-weight: bold;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 0 20px rgba(0,200,255,0.5), 0 4px 12px rgba(0,0,0,0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      z-index: 200;
+    }
+    .fab:hover {
+      transform: scale(1.08);
+      box-shadow: 0 0 28px rgba(0,200,255,0.7), 0 4px 16px rgba(0,0,0,0.4);
+    }
+
+    /* モーダル */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,4,12,0.75);
+      backdrop-filter: blur(4px);
+      z-index: 300;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: rgba(8, 16, 30, 0.97);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 0 40px rgba(0,200,255,0.12), 0 8px 32px rgba(0,0,0,0.6);
+    }
+    .modal h2 {
+      font-size: 1.05rem;
+      margin-bottom: 20px;
+      color: var(--accent);
+      letter-spacing: 0.08em;
+      font-weight: 700;
+      text-shadow: 0 0 10px rgba(0,200,255,0.4);
+    }
+    .form-group { margin-bottom: 14px; }
+    .form-group label {
+      display: block;
+      font-size: 0.78rem;
+      font-weight: 600;
+      margin-bottom: 5px;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      font-size: 0.92rem;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      font-family: inherit;
+      background: rgba(0,200,255,0.04);
+      color: var(--text);
+    }
+    .form-group input:focus,
+    .form-group select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(0,200,255,0.15);
+    }
+    .form-group select option { background: #0a1020; }
+    .form-row { display: flex; gap: 12px; }
+    .form-row .form-group { flex: 1; }
+    .modal-buttons { display: flex; gap: 10px; margin-top: 20px; }
+    .btn {
+      flex: 1;
+      padding: 11px;
+      border-radius: 7px;
+      border: none;
+      font-size: 0.88rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: inherit;
+      letter-spacing: 0.05em;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: var(--bg);
+      box-shadow: 0 0 12px rgba(0,200,255,0.3);
+    }
+    .btn-primary:hover { box-shadow: 0 0 20px rgba(0,200,255,0.55); transform: translateY(-1px); }
+    .btn-secondary {
+      background: rgba(255,255,255,0.06);
+      color: var(--muted);
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .btn-secondary:hover { background: rgba(255,255,255,0.1); color: var(--text); }
+    .btn-danger {
+      background: var(--danger);
+      color: white;
+      box-shadow: 0 0 10px rgba(255,63,94,0.3);
+    }
+    .btn-danger:hover { box-shadow: 0 0 18px rgba(255,63,94,0.5); transform: translateY(-1px); }
+
+    /* カテゴリ管理 */
+    .manage-section {
+      display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;
+    }
+    .manage-section h3 { font-size: 0.85rem; color: var(--muted); }
+    .btn-small {
+      padding: 5px 12px;
+      border-radius: 5px;
+      border: 1px solid var(--accent);
+      background: transparent;
+      color: var(--accent);
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      letter-spacing: 0.04em;
+      transition: all 0.15s;
+    }
+    .btn-small:hover { background: var(--accent); color: var(--bg); box-shadow: 0 0 10px rgba(0,200,255,0.4); }
+
+    .category-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(0,200,255,0.06);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 4px 8px 4px 10px;
+      margin: 3px;
+      font-size: 0.82rem;
+      color: var(--text);
+    }
+    .category-chip button {
+      border: none;
+      background: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 0.85rem;
+      padding: 0;
+      line-height: 1;
+      transition: color 0.15s;
+    }
+    .category-chip button:hover { color: var(--danger); }
+
+    /* 空の状態 */
+    .empty-state {
+      text-align: center;
+      padding: 50px 20px;
+      color: var(--muted);
+    }
+    .empty-state .icon { font-size: 2.8rem; margin-bottom: 12px; opacity: 0.5; }
+
+    /* 設定カード */
+    .settings-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      margin-bottom: 14px;
+      backdrop-filter: blur(10px);
+    }
+    .settings-card h3 {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .category-list { }
+
+    /* スクロールバー */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    /* 表示切替ボタン */
+    .view-toggle {
+      display: flex;
+      gap: 4px;
+      background: rgba(0,200,255,0.06);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 3px;
+    }
+    .view-toggle button {
+      width: 28px; height: 28px;
+      border: none;
+      background: none;
+      color: var(--muted);
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s;
+    }
+    .view-toggle button.active {
+      background: var(--accent);
+      color: var(--bg);
+    }
+
+    /* サムネイル（リスト表示） */
+    .item-thumb {
+      width: 40px;
+      height: 40px;
+      border-radius: 6px;
+      object-fit: cover;
+      border: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .item-thumb-placeholder {
+      width: 40px;
+      height: 40px;
+      border-radius: 6px;
+      border: 1px dashed rgba(0,200,255,0.2);
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      opacity: 0.3;
+    }
+
+    /* カードグリッド表示 */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+    .item-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+      transition: border-color 0.15s;
+    }
+    .item-card.low { border-color: rgba(255,63,94,0.4); }
+    .item-card-photo {
+      width: 100%;
+      aspect-ratio: 1;
+      object-fit: cover;
+      display: block;
+      background: rgba(0,200,255,0.04);
+    }
+    .item-card-photo-placeholder {
+      width: 100%;
+      aspect-ratio: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.5rem;
+      background: rgba(0,200,255,0.03);
+      border-bottom: 1px solid var(--border);
+      opacity: 0.4;
+    }
+    .item-card-body {
+      padding: 10px;
+    }
+    .item-card-name {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 8px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .item-card-counter {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 4px;
+    }
+    .item-card-actions {
+      display: flex;
+      gap: 2px;
+      justify-content: flex-end;
+      margin-top: 6px;
+    }
+
+    /* 写真入力 */
+    .photo-input-wrap {
+      position: relative;
+    }
+    .photo-preview {
+      width: 100%;
+      height: 140px;
+      border-radius: 7px;
+      border: 1px dashed rgba(0,200,255,0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 8px;
+      cursor: pointer;
+      overflow: hidden;
+      background: rgba(0,200,255,0.03);
+      transition: border-color 0.15s;
+    }
+    .photo-preview:hover { border-color: var(--accent); }
+    .photo-preview img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      position: absolute;
+      inset: 0;
+    }
+    .photo-preview-label {
+      font-size: 0.78rem;
+      color: var(--muted);
+      text-align: center;
+      line-height: 1.5;
+      position: relative;
+      z-index: 1;
+    }
+    .photo-preview-label span { font-size: 1.5rem; display: block; margin-bottom: 4px; }
+    .photo-remove {
+      position: absolute;
+      top: 6px; right: 6px;
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.6);
+      border: none;
+      color: white;
+      font-size: 0.75rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2;
+    }
+
+    /* 検索・並び替えバー */
+    .search-bar {
+      position: sticky;
+      top: calc(var(--header-h) + var(--tab-h));
+      z-index: 98;
+      background: rgba(4, 10, 22, 0.95);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 16px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .search-bar.hidden { display: none; }
+    .search-input-wrap {
+      flex: 1;
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    .search-icon {
+      position: absolute;
+      left: 10px;
+      font-size: 0.85rem;
+      pointer-events: none;
+      opacity: 0.5;
+    }
+    .search-input-wrap input {
+      width: 100%;
+      padding: 8px 32px 8px 32px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      font-size: 0.88rem;
+      outline: none;
+      font-family: inherit;
+      background: rgba(0,200,255,0.04);
+      color: var(--text);
+      transition: border-color 0.2s;
+    }
+    .search-input-wrap input:focus { border-color: var(--accent); }
+    .search-clear {
+      position: absolute;
+      right: 8px;
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 0.85rem;
+      padding: 2px;
+    }
+    .sort-select {
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      font-size: 0.78rem;
+      background: rgba(0,200,255,0.04);
+      color: var(--text);
+      font-family: inherit;
+      outline: none;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .sort-select option { background: #0a1020; }
+
+    /* メモ表示 */
+    .item-memo {
+      font-size: 0.7rem;
+      color: var(--muted);
+      margin-top: 2px;
+      letter-spacing: 0.02em;
+    }
+
+    /* バーコードスキャナーモーダル */
+    .scanner-modal {
+      background: rgba(8, 16, 30, 0.97);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 24px;
+      width: 100%;
+      max-width: 440px;
+      box-shadow: 0 0 40px rgba(0,200,255,0.12), 0 8px 32px rgba(0,0,0,0.6);
+    }
+    #scannerView {
+      width: 100%;
+      border-radius: 8px;
+      overflow: hidden;
+      background: #000;
+      min-height: 200px;
+    }
+    #scannerView video { width: 100% !important; }
+    .scan-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 10px;
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      background: transparent;
+      color: var(--accent);
+      font-size: 0.8rem;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .scan-btn:hover { background: var(--accent); color: var(--bg); }
+
+    /* 写真拡大表示 */
+    .photo-lightbox {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.88);
+      backdrop-filter: blur(6px);
+      z-index: 500;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .photo-lightbox.open { display: flex; }
+    .photo-lightbox-card {
+      background: rgba(8, 16, 30, 0.97);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      max-width: 420px;
+      width: 100%;
+      box-shadow: 0 0 40px rgba(0,200,255,0.15), 0 8px 40px rgba(0,0,0,0.7);
+      animation: lb-in 0.18s ease;
+    }
+    @keyframes lb-in {
+      from { transform: scale(0.9); opacity: 0; }
+      to   { transform: scale(1);   opacity: 1; }
+    }
+    .photo-lightbox-img {
+      width: 100%;
+      display: block;
+      max-height: 70vh;
+      object-fit: contain;
+      background: rgba(0,200,255,0.03);
+    }
+    .photo-lightbox-footer {
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-top: 1px solid var(--border);
+    }
+    .photo-lightbox-name {
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .photo-lightbox-close {
+      width: 30px; height: 30px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: none;
+      color: var(--muted);
+      font-size: 1rem;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.15s;
+    }
+    .photo-lightbox-close:hover { color: var(--text); border-color: var(--accent); }
+    .clickable-photo { cursor: zoom-in; }
+
+    /* 楽天で買うボタン */
+    .rakuten-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      background: #bf0000;
+      color: white;
+      border-radius: 4px;
+      font-size: 0.72rem;
+      text-decoration: none;
+      font-weight: 600;
+      margin-top: 4px;
+      transition: opacity 0.15s;
+    }
+    .rakuten-btn:hover { opacity: 0.8; }
+  </style>
+</head>
+<body>
+
+<!-- ログイン画面 -->
+<div id="loginScreen" style="
+  display:flex; position:fixed; inset:0; z-index:1000;
+  background:var(--bg); flex-direction:column;
+  align-items:center; justify-content:center; gap:24px;
+  background-image: linear-gradient(rgba(0,200,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,200,255,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+">
+  <div style="font-size:2.5rem;">🏠</div>
+  <div style="color:var(--accent);font-size:1.4rem;font-weight:700;letter-spacing:0.1em;text-shadow:0 0 16px rgba(0,200,255,0.5)">家の在庫管理</div>
+  <div style="color:var(--muted);font-size:0.85rem;margin-top:-12px">ログインして利用してください</div>
+  <button onclick="signInWithGoogle()" style="
+    display:flex; align-items:center; gap:10px;
+    background:white; color:#333; border:none;
+    padding:12px 24px; border-radius:8px;
+    font-size:0.95rem; font-weight:600; cursor:pointer;
+    box-shadow: 0 0 20px rgba(0,200,255,0.2);
+    font-family:inherit; transition: box-shadow 0.2s;
+  " onmouseover="this.style.boxShadow='0 0 30px rgba(0,200,255,0.4)'" onmouseout="this.style.boxShadow='0 0 20px rgba(0,200,255,0.2)'">
+    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="20">
+    Googleでログイン
+  </button>
+  <div id="loginError" style="color:var(--danger);font-size:0.8rem;display:none">ログインに失敗しました。もう一度お試しください。</div>
+</div>
+
+<header>
+  <h1>🏠 家の在庫管理 <span style="font-size:0.55rem;font-weight:400;color:var(--muted);letter-spacing:0.05em;vertical-align:middle">v1.7.0</span></h1>
+  <div style="display:flex;align-items:center;gap:10px">
+    <div class="view-toggle">
+      <button id="btnList" class="active" onclick="setView('list')" title="リスト表示">☰</button>
+      <button id="btnCard" onclick="setView('card')" title="カード表示">⊞</button>
+    </div>
+    <div id="lowStockBadge" class="low-stock-badge hidden">0</div>
+  </div>
+</header>
+
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('all')">全体</button>
+  <button class="tab" onclick="switchTab('byLocation')">場所別</button>
+  <button class="tab" onclick="switchTab('shopping')">🛒 買い物リスト</button>
+  <button class="tab" onclick="switchTab('settings')">⚙️ 設定</button>
+</div>
+
+<!-- 検索・並び替えバー -->
+<div id="searchBar" class="search-bar">
+  <div class="search-input-wrap">
+    <span class="search-icon">🔍</span>
+    <input type="text" id="searchInput" placeholder="アイテムを検索..." oninput="onSearch(this.value)">
+    <button class="search-clear" id="searchClear" style="display:none" onclick="clearSearch()">✕</button>
+  </div>
+  <select class="sort-select" id="sortSelect" onchange="onSort(this.value)">
+    <option value="default">標準順</option>
+    <option value="name">名前順</option>
+    <option value="low">残量少ない順</option>
+  </select>
+</div>
+
+<main>
+
+  <!-- 全体パネル -->
+  <div id="panel-all" class="panel active">
+    <div id="allItemsContainer"></div>
+  </div>
+
+  <!-- 場所別パネル -->
+  <div id="panel-byLocation" class="panel">
+    <div id="byLocationContainer"></div>
+  </div>
+
+  <!-- 買い物リストパネル -->
+  <div id="panel-shopping" class="panel">
+    <div id="shoppingContainer"></div>
+  </div>
+
+  <!-- 設定パネル -->
+  <div id="panel-settings" class="panel">
+    <div class="settings-card">
+      <h3>保管場所の管理</h3>
+      <div id="categoryList" class="category-list"></div>
+      <div style="margin-top:12px">
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="text" id="newCategoryInput" placeholder="新しい場所を入力（例：洗面所）"
+            style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:7px;font-size:0.88rem;outline:none;font-family:inherit;background:rgba(0,200,255,0.04);color:var(--text)"
+            onkeydown="if(event.key==='Enter')addCategory()">
+          <button class="btn-small" onclick="addCategory()">追加</button>
+        </div>
+      </div>
+    </div>
+    <div class="settings-card">
+      <h3>アプリの更新</h3>
+      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:12px">最新バージョンが反映されない場合に押してください</p>
+      <button class="btn btn-secondary" style="width:100%" onclick="location.reload(true)">🔄 最新版に更新する</button>
+    </div>
+    <div class="settings-card">
+      <h3>データ管理</h3>
+      <button class="btn btn-danger" style="width:100%" onclick="clearAllData()">すべてのデータを削除する</button>
+    </div>
+  </div>
+
+</main>
+
+<!-- 追加ボタン -->
+<button class="fab" id="fabBtn" onclick="openAddModal()" title="アイテムを追加">＋</button>
+
+<!-- アイテム追加・編集モーダル -->
+<div id="itemModal" class="modal-overlay">
+  <div class="modal">
+    <h2 id="modalTitle">アイテムを追加</h2>
+    <div class="form-group">
+      <label style="display:flex;align-items:center;justify-content:space-between">
+        アイテム名
+        <button class="scan-btn" onclick="openScanner()">📷 バーコード</button>
+      </label>
+      <input type="text" id="itemName" placeholder="例：シャンプー" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:7px;font-size:0.92rem;outline:none;font-family:inherit;background:rgba(0,200,255,0.04);color:var(--text)">
+      <div id="lookupStatus" style="display:none;margin-top:6px;font-size:0.78rem;padding:6px 10px;border-radius:5px;"></div>
+    </div>
+    <div class="form-group">
+      <label>メモ（任意）</label>
+      <input type="text" id="itemMemo" placeholder="例：コストコで購入、Aブランドのみ">
+    </div>
+    <div class="form-group">
+      <label>保管場所</label>
+      <select id="itemCategory">
+        <option value="">保管場所を選択</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>現在の個数</label>
+        <input type="number" id="itemCurrent" min="0" value="1">
+      </div>
+      <div class="form-group">
+        <label>最低個数 <span style="font-weight:normal;color:#888;font-size:0.8rem">（これ以下で警告）</span></label>
+        <input type="number" id="itemMinimum" min="0" value="1">
+      </div>
+    </div>
+    <div class="form-group">
+      <label style="display:flex;align-items:center;justify-content:space-between">
+        参考価格（任意）
+        <button onclick="openRakutenSearch()" style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border:1px solid var(--border);border-radius:5px;background:none;color:var(--muted);font-size:0.75rem;cursor:pointer;font-family:inherit;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">🛒 楽天で確認</button>
+      </label>
+      <div style="display:flex;align-items:center;gap:8px;padding:9px 12px;border:1px solid var(--border);border-radius:7px;background:rgba(0,200,255,0.04)">
+        <span style="color:var(--muted);font-size:0.9rem">💴 ¥</span>
+        <input type="number" id="refPriceInput" placeholder="例: 498" min="0" style="flex:1;border:none;background:none;color:var(--accent2);font-weight:700;font-size:0.95rem;outline:none;font-family:inherit;">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>写真（任意）</label>
+      <div class="photo-input-wrap">
+        <div class="photo-preview" onclick="document.getElementById('photoInput').click()">
+          <div class="photo-preview-label" id="photoLabel">
+            <span>📷</span>カメラで撮影 / 写真を選ぶ
+          </div>
+          <img id="photoPreviewImg" style="display:none">
+          <button class="photo-remove" id="photoRemoveBtn" style="display:none" onclick="removePhoto(event)">✕</button>
+        </div>
+        <input type="file" id="photoInput" accept="image/*" capture="environment" style="display:none" onchange="onPhotoSelected(this)">
+      </div>
+      <button id="ocrBtn" onclick="runOCR()" style="display:none;margin-top:8px;width:100%;padding:10px;border-radius:7px;border:1px solid var(--accent2);background:rgba(10,240,176,0.07);color:var(--accent2);font-size:0.85rem;font-weight:700;cursor:pointer;font-family:inherit;transition:all 0.15s;" onmouseover="this.style.background='rgba(10,240,176,0.15)'" onmouseout="this.style.background='rgba(10,240,176,0.07)'">
+        📖 写真から商品名・価格を読み取る
+      </button>
+    </div>
+    <div class="modal-buttons">
+      <button class="btn btn-secondary" onclick="closeItemModal()">キャンセル</button>
+      <button class="btn btn-primary" id="saveItemBtn" onclick="saveItem()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- バーコードスキャナーモーダル -->
+<div id="scannerModal" class="modal-overlay">
+  <div class="scanner-modal">
+    <h2 style="font-size:1.05rem;margin-bottom:16px;color:var(--accent);letter-spacing:0.08em;font-weight:700;text-shadow:0 0 10px rgba(0,200,255,0.4)">バーコードスキャン</h2>
+    <div id="scannerView"></div>
+    <p id="scannerStatus" style="margin:12px 0;color:var(--muted);font-size:0.82rem;text-align:center">カメラをバーコードに向けてください</p>
+    <div class="modal-buttons">
+      <button class="btn btn-secondary" onclick="closeScanner()">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+<!-- 写真拡大表示 -->
+<div id="photoLightbox" class="photo-lightbox" onclick="closePhotoLightbox()">
+  <div class="photo-lightbox-card" onclick="event.stopPropagation()">
+    <img id="lightboxImg" class="photo-lightbox-img" src="" alt="">
+    <div class="photo-lightbox-footer">
+      <span id="lightboxName" class="photo-lightbox-name"></span>
+      <button class="photo-lightbox-close" onclick="closePhotoLightbox()">✕</button>
+    </div>
+  </div>
+</div>
+
+<!-- 削除確認モーダル -->
+<div id="confirmModal" class="modal-overlay">
+  <div class="modal">
+    <h2>削除の確認</h2>
+    <p id="confirmMessage" style="margin-bottom:20px;color:#555;font-size:0.95rem"></p>
+    <div class="modal-buttons">
+      <button class="btn btn-secondary" onclick="closeConfirmModal()">キャンセル</button>
+      <button class="btn btn-danger" id="confirmDeleteBtn">削除する</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://unpkg.com/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+
+<script>
+  // ========== Firebase 初期化 ==========
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyC1jk0jir3l2eYyVu6ZYOrgrfDxiLLEflM",
+    authDomain: "zaikokanri2026.firebaseapp.com",
+    databaseURL: "https://zaikokanri2026-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "zaikokanri2026",
+    storageBucket: "zaikokanri2026.firebasestorage.app",
+    messagingSenderId: "67118745070",
+    appId: "1:67118745070:web:763f1e75dffab192b07aff"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+  const auth = firebase.auth();
+
+  // ========== 認証 ==========
+
+  let currentUid = null;
+
+  const ALLOWED_UIDS = [
+    'zKEccJZZI3YMK3vzP8dR0eEgMv03',
+    '9ORYcaXJpsUbBBJNLGiMiMClHPG2',
+  ];
+
+  function userRef(path) {
+    return db.ref('users/' + currentUid + '/' + path);
+  }
+
+  function signInWithGoogle() {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    auth.signInWithPopup(provider).catch(() => {
+      document.getElementById('loginError').style.display = 'block';
+    });
+  }
+
+  auth.onAuthStateChanged(user => {
+    if (user) {
+      if (!ALLOWED_UIDS.includes(user.uid)) {
+        auth.signOut();
+        document.getElementById('loginError').textContent = 'このアカウントはアクセスできません。';
+        document.getElementById('loginError').style.display = 'block';
+        return;
+      }
+      // ユーザーが切り替わったときのためにフラグをリセット
+      listenersStarted = false;
+      categoriesLoaded = false;
+      itemsLoaded = false;
+      sampleChecked = false;
+      appData = { categories: [], items: [] };
+
+      currentUid = user.uid;
+      document.getElementById('loginScreen').style.display = 'none';
+      startDataListeners();
+    } else {
+      currentUid = null;
+      document.getElementById('loginScreen').style.display = 'flex';
+    }
+  });
+
+  // ========== データ管理 ==========
+
+  let appData = { categories: [], items: [] };
+  let categoriesLoaded = false;
+  let itemsLoaded = false;
+  let sampleChecked = false;
+  let listenersStarted = false;
+
+  function snapToArray(snap) {
+    const val = snap.val();
+    if (!val) return [];
+    return Object.entries(val).map(([id, data]) => ({ id, ...data }));
+  }
+
+  function startDataListeners() {
+    if (listenersStarted) return;
+    listenersStarted = true;
+
+    userRef('categories').on('value', snap => {
+      appData.categories = snapToArray(snap);
+      categoriesLoaded = true;
+      checkAndAddSampleData();
+      render();
+    });
+
+    userRef('items').on('value', snap => {
+      appData.items = snapToArray(snap);
+      itemsLoaded = true;
+      checkAndAddSampleData();
+      render();
+    });
+  }
+
+  function checkAndAddSampleData() {
+    if (!categoriesLoaded || !itemsLoaded || sampleChecked) return;
+    if (appData.categories.length > 0 || appData.items.length > 0) {
+      sampleChecked = true;
+      return;
+    }
+    sampleChecked = true;
+    userRef('categories').set({
+      c1: { name: '洗面所' }, c2: { name: 'トイレ' },
+      c3: { name: '洗濯機まわり' }, c4: { name: 'キッチン下' },
+    });
+    userRef('items').set({
+      i1: { name: 'シャンプー',        categoryId: 'c1', current: 2, minimum: 1 },
+      i2: { name: 'コンディショナー',  categoryId: 'c1', current: 1, minimum: 1 },
+      i3: { name: '歯磨き粉',          categoryId: 'c1', current: 3, minimum: 2 },
+      i4: { name: 'トイレットペーパー', categoryId: 'c2', current: 1, minimum: 3 },
+      i5: { name: 'トイレ用洗剤',      categoryId: 'c2', current: 2, minimum: 1 },
+      i6: { name: '洗濯洗剤',          categoryId: 'c3', current: 1, minimum: 1 },
+      i7: { name: '柔軟剤',            categoryId: 'c3', current: 0, minimum: 1 },
+      i8: { name: '食器用洗剤',        categoryId: 'c4', current: 2, minimum: 1 },
+      i9: { name: 'スポンジ',          categoryId: 'c4', current: 4, minimum: 2 },
+    });
+  }
+
+  function generateId() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  }
+
+  // ========== 表示切替 ==========
+
+  let currentView = 'list';
+
+  function setView(v) {
+    currentView = v;
+    document.getElementById('btnList').classList.toggle('active', v === 'list');
+    document.getElementById('btnCard').classList.toggle('active', v === 'card');
+    render();
+  }
+
+  // ========== 検索・並び替え ==========
+
+  let currentSearch = '';
+  let currentSort = 'default';
+
+  function onSearch(val) {
+    currentSearch = val.trim();
+    document.getElementById('searchClear').style.display = currentSearch ? 'block' : 'none';
+    render();
+  }
+
+  function clearSearch() {
+    document.getElementById('searchInput').value = '';
+    onSearch('');
+  }
+
+  function onSort(val) {
+    currentSort = val;
+    render();
+  }
+
+  function applySearchAndSort(items) {
+    let result = [...items];
+    if (currentSearch) {
+      const q = currentSearch.toLowerCase();
+      result = result.filter(i =>
+        i.name.toLowerCase().includes(q) ||
+        (i.memo || '').toLowerCase().includes(q)
+      );
+    }
+    if (currentSort === 'name') {
+      result.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+    } else if (currentSort === 'low') {
+      result.sort((a, b) => (a.current - a.minimum) - (b.current - b.minimum));
+    } else {
+      result.sort((a, b) => {
+        if (isLow(a) && !isLow(b)) return -1;
+        if (!isLow(a) && isLow(b)) return 1;
+        return 0;
+      });
+    }
+    return result;
+  }
+
+  // ========== バーコードスキャン ==========
+
+  let html5QrCode = null;
+
+  function openScanner() {
+    document.getElementById('scannerModal').classList.add('open');
+    document.getElementById('scannerStatus').textContent = 'カメラを起動中...';
+    html5QrCode = new Html5Qrcode('scannerView');
+    html5QrCode.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: { width: 240, height: 120 } },
+      async (decoded) => {
+        await html5QrCode.stop();
+        html5QrCode = null;
+        closeScanner();
+        await lookupBarcode(decoded);
+      },
+      () => {}
+    ).then(() => {
+      document.getElementById('scannerStatus').textContent = 'カメラをバーコードに向けてください';
+    }).catch(() => {
+      document.getElementById('scannerStatus').textContent = 'カメラへのアクセスを許可してください';
+    });
+  }
+
+  async function closeScanner() {
+    if (html5QrCode) {
+      await html5QrCode.stop().catch(() => {});
+      html5QrCode = null;
+    }
+    document.getElementById('scannerModal').classList.remove('open');
+  }
+
+  function showLookupStatus(msg, isError) {
+    const el = document.getElementById('lookupStatus');
+    el.textContent = msg;
+    el.style.display = 'block';
+    el.style.background = isError ? 'rgba(255,63,94,0.1)' : 'rgba(0,200,255,0.07)';
+    el.style.color = isError ? 'var(--danger)' : 'var(--muted)';
+  }
+
+  function hideLookupStatus() {
+    document.getElementById('lookupStatus').style.display = 'none';
+  }
+
+  function openRakutenSearch() {
+    const name = document.getElementById('itemName').value.trim();
+    if (!name) { showLookupStatus('⚠️ 商品名を入力してください。', true); return; }
+    window.open(`https://search.rakuten.co.jp/search/mall/${encodeURIComponent(name)}/`, '_blank');
+  }
+
+  async function lookupBarcode(barcode) {
+    document.getElementById('itemName').value = barcode;
+    showLookupStatus('⚠️ 商品名を手入力してください。', true);
+    document.getElementById('itemName').focus();
+  }
+
+  // ========== タブ切り替え ==========
+
+  let currentTab = 'all';
+
+  function switchTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll('.tab').forEach((t, i) => {
+      const tabs = ['all', 'byLocation', 'shopping', 'settings'];
+      t.classList.toggle('active', tabs[i] === tab);
+    });
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('panel-' + tab).classList.add('active');
+    document.getElementById('fabBtn').style.display = (tab === 'settings') ? 'none' : 'flex';
+    document.getElementById('searchBar').classList.toggle('hidden', tab === 'shopping' || tab === 'settings');
+    render();
+  }
+
+  // ========== 描画 ==========
+
+  function isLow(item) {
+    return item.current <= item.minimum;
+  }
+
+  function render() {
+    renderAll();
+    renderByLocation();
+    renderShopping();
+    renderSettings();
+    renderBadge();
+  }
+
+  function renderBadge() {
+    const { items } = appData;
+    const lowCount = items.filter(isLow).length;
+    const badge = document.getElementById('lowStockBadge');
+    badge.textContent = lowCount;
+    badge.classList.toggle('hidden', lowCount === 0);
+  }
+
+  function renderAll() {
+    const { items, categories } = appData;
+    const container = document.getElementById('allItemsContainer');
+
+    if (items.length === 0) {
+      container.innerHTML = `<div class="empty-state"><div class="icon">📦</div><p>アイテムがありません<br>右下の＋ボタンから追加してください</p></div>`;
+      return;
+    }
+
+    const getCatName = id => (categories.find(c => c.id === id) || {}).name || '未分類';
+    const filtered = applySearchAndSort(items);
+
+    if (filtered.length === 0) {
+      container.innerHTML = `<div class="empty-state"><div class="icon">🔍</div><p>「${currentSearch}」に一致するアイテムはありません</p></div>`;
+      return;
+    }
+
+    if (currentView === 'card') {
+      container.innerHTML = `<div class="card-grid">${filtered.map(item => renderItemCard(item, getCatName(item.categoryId))).join('')}</div>`;
+    } else {
+      container.innerHTML = filtered.map(item => renderItemRow(item, getCatName(item.categoryId), true)).join('');
+    }
+  }
+
+  function renderByLocation() {
+    const { items, categories } = appData;
+    const container = document.getElementById('byLocationContainer');
+
+    if (categories.length === 0) {
+      container.innerHTML = `<div class="empty-state"><div class="icon">📍</div><p>保管場所がまだ登録されていません<br>「設定」タブから追加してください</p></div>`;
+      return;
+    }
+
+    let html = '';
+    const searchedItems = currentSearch ? applySearchAndSort(items) : null;
+
+    categories.forEach(cat => {
+      const catItems = (searchedItems || items).filter(i => i.categoryId === cat.id);
+      if (searchedItems && catItems.length === 0) return;
+      const hasLow = catItems.some(isLow);
+      html += `
+        <div class="section-card">
+          <div class="section-header" onclick="toggleSection(this)">
+            <span>${cat.name} <span style="color:var(--muted);font-weight:normal;font-size:0.8rem">(${catItems.length}品)</span>${hasLow ? ' <span style="color:var(--danger);font-size:0.75rem;text-shadow:0 0 6px rgba(255,63,94,0.6)">● 残り少</span>' : ''}</span>
+            <span class="arrow">▼</span>
+          </div>
+          <div class="section-body">
+            ${catItems.length === 0
+              ? `<div style="padding:16px;text-align:center;color:var(--muted);font-size:0.85rem">この場所にはアイテムがありません</div>`
+              : catItems.map(item => renderItemRow(item, null, false)).join('')
+            }
+          </div>
+        </div>`;
+    });
+
+    // 未分類
+    const uncategorized = items.filter(i => !categories.find(c => c.id === i.categoryId));
+    if (uncategorized.length > 0) {
+      html += `
+        <div class="section-card">
+          <div class="section-header" onclick="toggleSection(this)">
+            <span>未分類 <span style="color:var(--muted);font-weight:normal;font-size:0.8rem">(${uncategorized.length}品)</span></span>
+            <span class="arrow">▼</span>
+          </div>
+          <div class="section-body">
+            ${uncategorized.map(item => renderItemRow(item, null, false)).join('')}
+          </div>
+        </div>`;
+    }
+
+    container.innerHTML = html;
+  }
+
+  function renderShopping() {
+    const { items, categories } = appData;
+    const container = document.getElementById('shoppingContainer');
+    const lowItems = items.filter(isLow);
+
+    if (lowItems.length === 0) {
+      container.innerHTML = `<div class="shopping-empty"><span class="icon">🎉</span><p>残り少ないものはありません！<br>在庫は十分です。</p></div>`;
+      return;
+    }
+
+    const getCatName = id => (categories.find(c => c.id === id) || {}).name || '未分類';
+
+    container.innerHTML = `
+      <div style="background:rgba(255,63,94,0.08);border:1px solid rgba(255,63,94,0.3);border-radius:8px;padding:12px 16px;margin-bottom:14px;color:var(--danger);font-size:0.88rem;letter-spacing:0.03em;">
+        ⚠️ ${lowItems.length}品の在庫が残り少なくなっています
+      </div>
+      <div class="section-card">
+        ${lowItems.map(item => `
+          <div class="item-row low">
+            <div class="item-name">
+              ${item.name}
+              <div class="item-location">📍 ${getCatName(item.categoryId)}</div>
+            </div>
+            <div class="counter">
+              <button onclick="changeCount('${item.id}', -1)" ${item.current <= 0 ? 'disabled' : ''}>−</button>
+              <span class="count-display low">${item.current}</span>
+              <button onclick="changeCount('${item.id}', 1)">＋</button>
+            </div>
+          </div>
+        `).join('')}
+      </div>`;
+  }
+
+  function renderSettings() {
+    const { categories } = appData;
+    const container = document.getElementById('categoryList');
+
+    if (categories.length === 0) {
+      container.innerHTML = `<p style="color:var(--muted);font-size:0.85rem;margin-bottom:8px">まだ保管場所がありません</p>`;
+      return;
+    }
+
+    container.innerHTML = categories.map(cat => `
+      <span class="category-chip">
+        ${cat.name}
+        <button onclick="deleteCategory('${cat.id}')" title="削除">✕</button>
+      </span>
+    `).join('');
+  }
+
+  function renderItemRow(item, locationName, showLocation) {
+    const low = isLow(item);
+    const thumb = item.photo
+      ? `<img class="item-thumb clickable-photo" src="${item.photo}" alt="" onclick="openPhotoLightbox('${item.photo}','${item.name.replace(/'/g,'&#39;')}')">`
+      : `<div class="item-thumb-placeholder">📦</div>`;
+    return `
+      <div class="item-row ${low ? 'low' : ''}">
+        ${thumb}
+        <div class="item-name">
+          ${item.name}
+          ${low ? '<span class="low-label">残り少</span>' : ''}
+          ${showLocation && locationName ? `<div class="item-location">📍 ${locationName}</div>` : ''}
+          ${item.memo ? `<div class="item-memo">📝 ${item.memo}</div>` : ''}
+          ${item.refPrice ? `<div class="item-memo">💴 ¥${Number(item.refPrice).toLocaleString()} <a class="rakuten-btn" href="https://search.rakuten.co.jp/search/mall/${encodeURIComponent(item.name)}/" target="_blank" rel="noopener">🛒 楽天で確認</a></div>` : ''}
+        </div>
+        <div class="counter">
+          <button onclick="changeCount('${item.id}', -1)" ${item.current <= 0 ? 'disabled' : ''}>−</button>
+          <span class="count-display ${low ? 'low' : ''}">${item.current}</span>
+          <button onclick="changeCount('${item.id}', 1)">＋</button>
+        </div>
+        <div class="item-actions">
+          <button class="btn-icon" onclick="openEditModal('${item.id}')" title="編集">✏️</button>
+          <button class="btn-icon" onclick="confirmDeleteItem('${item.id}')" title="削除">🗑️</button>
+        </div>
+      </div>`;
+  }
+
+  function renderItemCard(item, locationName) {
+    const low = isLow(item);
+    const photo = item.photo
+      ? `<img class="item-card-photo clickable-photo" src="${item.photo}" alt="" onclick="openPhotoLightbox('${item.photo}','${item.name.replace(/'/g,'&#39;')}')">`
+      : `<div class="item-card-photo-placeholder">📦</div>`;
+    return `
+      <div class="item-card ${low ? 'low' : ''}">
+        ${photo}
+        <div class="item-card-body">
+          <div class="item-card-name">
+            ${item.name}
+            ${low ? '<span class="low-label">残り少</span>' : ''}
+          </div>
+          ${locationName ? `<div class="item-location" style="margin-bottom:4px">📍 ${locationName}</div>` : ''}
+          ${item.memo ? `<div class="item-memo" style="margin-bottom:2px">📝 ${item.memo}</div>` : ''}
+          ${item.refPrice ? `<div class="item-memo" style="margin-bottom:4px">💴 ¥${Number(item.refPrice).toLocaleString()} <a class="rakuten-btn" href="https://search.rakuten.co.jp/search/mall/${encodeURIComponent(item.name)}/" target="_blank" rel="noopener">🛒 楽天</a></div>` : ''}
+          <div class="item-card-counter">
+            <div class="counter">
+              <button onclick="changeCount('${item.id}', -1)" ${item.current <= 0 ? 'disabled' : ''}>−</button>
+              <span class="count-display ${low ? 'low' : ''}">${item.current}</span>
+              <button onclick="changeCount('${item.id}', 1)">＋</button>
+            </div>
+          </div>
+          <div class="item-card-actions">
+            <button class="btn-icon" onclick="openEditModal('${item.id}')" title="編集">✏️</button>
+            <button class="btn-icon" onclick="confirmDeleteItem('${item.id}')" title="削除">🗑️</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  // ========== 写真機能 ==========
+
+  let currentPhotoData = null;
+
+  function resetPhotoPreview() {
+    currentPhotoData = null;
+    document.getElementById('photoPreviewImg').style.display = 'none';
+    document.getElementById('photoPreviewImg').src = '';
+    document.getElementById('photoRemoveBtn').style.display = 'none';
+    document.getElementById('photoLabel').style.display = '';
+    document.getElementById('photoInput').value = '';
+    document.getElementById('ocrBtn').style.display = 'none';
+  }
+
+  function setPhotoPreview(dataUrl) {
+    currentPhotoData = dataUrl;
+    const img = document.getElementById('photoPreviewImg');
+    img.src = dataUrl;
+    img.style.display = 'block';
+    document.getElementById('photoRemoveBtn').style.display = 'flex';
+    document.getElementById('photoLabel').style.display = 'none';
+    document.getElementById('ocrBtn').style.display = 'block';
+  }
+
+  async function runOCR() {
+    if (!currentPhotoData) return;
+    const btn = document.getElementById('ocrBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳ 読み取り中...（初回は時間がかかります）';
+    showLookupStatus('🔍 写真から文字を読み取っています...', false);
+    try {
+      const worker = await Tesseract.createWorker('jpn');
+      const { data: { text } } = await worker.recognize(currentPhotoData);
+      await worker.terminate();
+
+      const lines = text.split('\n')
+        .map(l => l.trim())
+        .filter(l => l.length >= 2 && l.length <= 40);
+      const cleaned = lines.length > 0
+        ? lines.reduce((a, b) => a.length >= b.length ? a : b)
+        : text.trim().slice(0, 40);
+
+      if (cleaned) {
+        document.getElementById('itemName').value = cleaned;
+        showLookupStatus('✅ 読み取り完了。名前を確認・編集して、「🛒 楽天で確認」で価格を調べられます。', false);
+      } else {
+        showLookupStatus('⚠️ 文字を読み取れませんでした。手入力してください。', true);
+      }
+    } catch (e) {
+      showLookupStatus('⚠️ 読み取りエラー。手入力してください。', true);
+    }
+    btn.disabled = false;
+    btn.textContent = '📖 写真から商品名・価格を読み取る';
+  }
+
+  function compressImage(file) {
+    return new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onload = e => {
+        const img = new Image();
+        img.onload = () => {
+          const MAX = 400;
+          let w = img.width, h = img.height;
+          if (w > h && w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+          else if (h > MAX) { w = Math.round(w * MAX / h); h = MAX; }
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', 0.7));
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function onPhotoSelected(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const compressed = await compressImage(file);
+    setPhotoPreview(compressed);
+  }
+
+  function removePhoto(event) {
+    event.stopPropagation();
+    resetPhotoPreview();
+  }
+
+  function openPhotoLightbox(photoUrl, itemName) {
+    document.getElementById('lightboxImg').src = photoUrl;
+    document.getElementById('lightboxName').textContent = itemName;
+    document.getElementById('photoLightbox').classList.add('open');
+  }
+
+  function closePhotoLightbox() {
+    document.getElementById('photoLightbox').classList.remove('open');
+    document.getElementById('lightboxImg').src = '';
+  }
+
+  function toggleSection(header) {
+    header.classList.toggle('collapsed');
+    header.nextElementSibling.classList.toggle('collapsed');
+  }
+
+  // ========== カテゴリ管理 ==========
+
+  function addCategory() {
+    const input = document.getElementById('newCategoryInput');
+    const name = input.value.trim();
+    if (!name) { input.focus(); return; }
+    userRef('categories/' + generateId()).set({ name });
+    input.value = '';
+  }
+
+  function deleteCategory(id) {
+    const cat = appData.categories.find(c => c.id === id);
+    if (!cat) return;
+    const usedByItems = appData.items.filter(i => i.categoryId === id).length;
+    const msg = usedByItems > 0
+      ? `「${cat.name}」を削除しますか？\nこの場所のアイテム ${usedByItems} 品は「未分類」になります。`
+      : `「${cat.name}」を削除しますか？`;
+    openConfirmModal(msg, () => {
+      userRef('categories/' + id).remove();
+    });
+  }
+
+  // ========== アイテム管理 ==========
+
+  let editingItemId = null;
+
+  function populateCategorySelect() {
+    const { categories } = appData;
+    const sel = document.getElementById('itemCategory');
+    sel.innerHTML = '<option value="">保管場所を選択</option>' +
+      categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+  }
+
+  function openAddModal() {
+    editingItemId = null;
+    document.getElementById('modalTitle').textContent = 'アイテムを追加';
+    document.getElementById('saveItemBtn').textContent = '追加する';
+    document.getElementById('itemName').value = '';
+    document.getElementById('itemMemo').value = '';
+    document.getElementById('itemCurrent').value = '1';
+    document.getElementById('itemMinimum').value = '1';
+    document.getElementById('refPriceInput').value = '';
+    hideLookupStatus();
+    resetPhotoPreview();
+    populateCategorySelect();
+    document.getElementById('itemModal').classList.add('open');
+    setTimeout(() => document.getElementById('itemName').focus(), 100);
+  }
+
+  function openEditModal(id) {
+    const item = appData.items.find(i => i.id === id);
+    if (!item) return;
+    editingItemId = id;
+    document.getElementById('modalTitle').textContent = 'アイテムを編集';
+    document.getElementById('saveItemBtn').textContent = '保存する';
+    document.getElementById('itemName').value = item.name;
+    document.getElementById('itemMemo').value = item.memo || '';
+    document.getElementById('itemCurrent').value = item.current;
+    document.getElementById('itemMinimum').value = item.minimum;
+    document.getElementById('refPriceInput').value = item.refPrice || '';
+    hideLookupStatus();
+    resetPhotoPreview();
+    if (item.photo) setPhotoPreview(item.photo);
+    populateCategorySelect();
+    document.getElementById('itemCategory').value = item.categoryId || '';
+    document.getElementById('itemModal').classList.add('open');
+  }
+
+  function closeItemModal() {
+    document.getElementById('itemModal').classList.remove('open');
+    hideLookupStatus();
+    resetPhotoPreview();
+  }
+
+  function saveItem() {
+    const name = document.getElementById('itemName').value.trim();
+    const memo = document.getElementById('itemMemo').value.trim();
+    const categoryId = document.getElementById('itemCategory').value;
+    const current = parseInt(document.getElementById('itemCurrent').value) || 0;
+    const minimum = parseInt(document.getElementById('itemMinimum').value) || 0;
+
+    if (!name) {
+      document.getElementById('itemName').focus();
+      document.getElementById('itemName').style.borderColor = 'var(--danger)';
+      setTimeout(() => document.getElementById('itemName').style.borderColor = '', 1500);
+      return;
+    }
+
+    const refPrice = parseInt(document.getElementById('refPriceInput').value) || null;
+    const data = { name, memo: memo || null, categoryId, current, minimum, refPrice, photo: currentPhotoData || null };
+
+    if (editingItemId) {
+      userRef('items/' + editingItemId).update(data);
+    } else {
+      userRef('items/' + generateId()).set(data);
+    }
+    closeItemModal();
+  }
+
+  function changeCount(id, delta) {
+    const item = appData.items.find(i => i.id === id);
+    if (!item) return;
+    userRef('items/' + id + '/current').set(Math.max(0, item.current + delta));
+  }
+
+  function confirmDeleteItem(id) {
+    const item = appData.items.find(i => i.id === id);
+    if (!item) return;
+    openConfirmModal(`「${item.name}」を削除しますか？`, () => {
+      userRef('items/' + id).remove();
+    });
+  }
+
+  // ========== 確認モーダル ==========
+
+  let confirmCallback = null;
+
+  function openConfirmModal(message, callback) {
+    confirmCallback = callback;
+    document.getElementById('confirmMessage').textContent = message;
+    document.getElementById('confirmModal').classList.add('open');
+    document.getElementById('confirmDeleteBtn').onclick = () => {
+      const cb = confirmCallback;
+      closeConfirmModal();
+      if (cb) cb();
+    };
+  }
+
+  function closeConfirmModal() {
+    document.getElementById('confirmModal').classList.remove('open');
+    confirmCallback = null;
+  }
+
+  // ========== データ全削除 ==========
+
+  function clearAllData() {
+    openConfirmModal('すべてのデータを削除します。この操作は元に戻せません。', () => {
+      userRef('categories').remove();
+      userRef('items').remove();
+    });
+  }
+
+  // ========== モーダル外クリックで閉じる ==========
+
+  document.getElementById('itemModal').addEventListener('click', function(e) {
+    if (e.target === this) closeItemModal();
+  });
+  document.getElementById('confirmModal').addEventListener('click', function(e) {
+    if (e.target === this) closeConfirmModal();
+  });
+
+  // ========== Enterキーで保存 ==========
+
+  document.getElementById('itemModal').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') saveItem();
+    if (e.key === 'Escape') closeItemModal();
+  });
+
+  // Firebase のリスナーが初期化・描画を担当するため、ここでの手動初期化は不要
+</script>
+</body>
+</html>
