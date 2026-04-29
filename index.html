@@ -623,6 +623,26 @@
       position: absolute;
       inset: 0;
     }
+    .admin-detail-photo {
+      width: 100%;
+      max-height: 220px;
+      object-fit: contain;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: rgba(0,200,255,0.03);
+      margin-top: 8px;
+    }
+    .admin-detail-value {
+      padding: 9px 12px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: rgba(0,200,255,0.04);
+      color: var(--text);
+      font-size: 0.92rem;
+      min-height: 38px;
+      display: flex;
+      align-items: center;
+    }
     .photo-preview-label {
       font-size: 0.78rem;
       color: var(--muted);
@@ -860,7 +880,7 @@
 </div>
 
 <header>
-  <h1>🏠 家の在庫管理 <span style="font-size:0.55rem;font-weight:400;color:var(--accent);letter-spacing:0.05em;vertical-align:middle">v1.7.1</span></h1>
+  <h1>🏠 家の在庫管理 <span style="font-size:0.55rem;font-weight:400;color:var(--accent);letter-spacing:0.05em;vertical-align:middle">v1.7.2</span></h1>
   <div style="display:flex;align-items:center;gap:10px">
     <div class="view-toggle">
       <button id="btnList" class="active" onclick="setView('list')" title="リスト表示">☰</button>
@@ -1009,6 +1029,51 @@
     <div class="modal-buttons">
       <button class="btn btn-secondary" onclick="closeItemModal()">キャンセル</button>
       <button class="btn btn-primary" id="saveItemBtn" onclick="saveItem()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 管理者用アイテム詳細モーダル -->
+<div id="adminItemModal" class="modal-overlay">
+  <div class="modal">
+    <h2 id="adminItemTitle">アイテム詳細</h2>
+    <div class="form-group">
+      <label>ユーザー</label>
+      <div class="admin-detail-value" id="adminItemUser"></div>
+    </div>
+    <div class="form-group">
+      <label>アイテム名</label>
+      <div class="admin-detail-value" id="adminItemName"></div>
+    </div>
+    <div class="form-group">
+      <label>メモ</label>
+      <div class="admin-detail-value" id="adminItemMemo"></div>
+    </div>
+    <div class="form-group">
+      <label>保管場所</label>
+      <div class="admin-detail-value" id="adminItemCategory"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>現在の個数</label>
+        <div class="admin-detail-value" id="adminItemCurrent"></div>
+      </div>
+      <div class="form-group">
+        <label>最低個数</label>
+        <div class="admin-detail-value" id="adminItemMinimum"></div>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>参考価格</label>
+      <div class="admin-detail-value" id="adminItemRefPrice"></div>
+    </div>
+    <div class="form-group">
+      <label>写真</label>
+      <div class="admin-detail-value" id="adminItemPhotoEmpty"></div>
+      <img id="adminItemPhoto" class="admin-detail-photo" style="display:none" alt="">
+    </div>
+    <div class="modal-buttons">
+      <button class="btn btn-secondary" style="width:100%" onclick="closeAdminItemModal()">閉じる</button>
     </div>
   </div>
 </div>
@@ -1603,16 +1668,21 @@
         <h3>${escapeHtml(userLabel)} の在庫</h3>
         ${items.length === 0
           ? '<div class="empty-state" style="padding:24px 12px"><p>このユーザーのアイテムはまだありません</p></div>'
-          : `<div class="section-card">${items.map(item => renderAdminItemRow(item, getCatName(item.categoryId))).join('')}</div>`
+          : `<div class="section-card">${items.map(item => renderAdminItemRow(item, getCatName(item.categoryId), selected.uid)).join('')}</div>`
         }
       </div>`;
   }
 
-  function renderAdminItemRow(item, locationName) {
+  function renderAdminItemRow(item, locationName, ownerUid) {
     const low = isLow(item);
+    const itemId = escapeJsArg(item.id);
+    const ownerId = escapeJsArg(ownerUid);
+    const thumb = item.photo
+      ? `<img class="item-thumb clickable-photo" src="${escapeHtml(item.photo)}" alt="">`
+      : '<div class="item-thumb-placeholder">📦</div>';
     return `
       <div class="item-row ${low ? 'low' : ''}">
-        <div class="item-thumb-placeholder">📦</div>
+        ${thumb}
         <div class="item-name">
           ${escapeHtml(item.name)}
           ${low ? '<span class="low-label">残り少</span>' : ''}
@@ -1622,7 +1692,54 @@
         <div class="counter">
           <span class="count-display ${low ? 'low' : ''}">${escapeHtml(item.current)}</span>
         </div>
+        <div class="item-actions">
+          <button class="btn-icon" onclick="openAdminItemModal('${ownerId}', '${itemId}')" title="詳細">👁️</button>
+        </div>
       </div>`;
+  }
+
+  function openAdminItemModal(ownerUid, itemId) {
+    if (!isAdminUser(currentUser)) return;
+    const owner = adminData.users.find(u => u.uid === ownerUid);
+    if (!owner || !owner.items || !owner.items[itemId]) return;
+
+    const item = owner.items[itemId];
+    const categories = owner.categories
+      ? Object.entries(owner.categories).map(([id, data]) => ({ id, ...(data || {}) }))
+      : [];
+    const categoryName = (categories.find(c => c.id === item.categoryId) || {}).name || '未分類';
+    const profile = owner.profile || {};
+    const userLabel = profile.email || USER_LABELS[owner.uid] || profile.displayName || owner.uid;
+    const photo = document.getElementById('adminItemPhoto');
+    const photoEmpty = document.getElementById('adminItemPhotoEmpty');
+
+    document.getElementById('adminItemTitle').textContent = 'アイテム詳細';
+    document.getElementById('adminItemUser').textContent = userLabel;
+    document.getElementById('adminItemName').textContent = item.name || '';
+    document.getElementById('adminItemMemo').textContent = item.memo || 'なし';
+    document.getElementById('adminItemCategory').textContent = categoryName;
+    document.getElementById('adminItemCurrent').textContent = item.current ?? 0;
+    document.getElementById('adminItemMinimum').textContent = item.minimum ?? 0;
+    document.getElementById('adminItemRefPrice').textContent = item.refPrice ? `¥${Number(item.refPrice).toLocaleString()}` : 'なし';
+
+    if (item.photo) {
+      photo.src = item.photo;
+      photo.style.display = 'block';
+      photoEmpty.style.display = 'none';
+      photoEmpty.textContent = '';
+    } else {
+      photo.src = '';
+      photo.style.display = 'none';
+      photoEmpty.style.display = 'flex';
+      photoEmpty.textContent = '写真なし';
+    }
+
+    document.getElementById('adminItemModal').classList.add('open');
+  }
+
+  function closeAdminItemModal() {
+    document.getElementById('adminItemModal').classList.remove('open');
+    document.getElementById('adminItemPhoto').src = '';
   }
 
   function renderItemRow(item, locationName, showLocation) {
@@ -1945,6 +2062,9 @@
 
   document.getElementById('itemModal').addEventListener('click', function(e) {
     if (e.target === this) closeItemModal();
+  });
+  document.getElementById('adminItemModal').addEventListener('click', function(e) {
+    if (e.target === this) closeAdminItemModal();
   });
   document.getElementById('confirmModal').addEventListener('click', function(e) {
     if (e.target === this) closeConfirmModal();
