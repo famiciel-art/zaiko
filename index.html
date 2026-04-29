@@ -643,6 +643,38 @@
       display: flex;
       align-items: center;
     }
+    .ocr-candidate-list {
+      display: grid;
+      gap: 8px;
+      max-height: 240px;
+      overflow: auto;
+      padding-right: 2px;
+    }
+    .ocr-candidate-row {
+      display: grid;
+      grid-template-columns: 22px 1fr;
+      gap: 8px;
+      align-items: center;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: rgba(0,200,255,0.04);
+    }
+    .ocr-candidate-row input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--accent);
+    }
+    .ocr-candidate-row input[type="text"] {
+      width: 100%;
+      padding: 7px 9px;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 6px;
+      background: rgba(0,0,0,0.16);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.86rem;
+    }
     .photo-preview-label {
       font-size: 0.78rem;
       color: var(--muted);
@@ -880,7 +912,7 @@
 </div>
 
 <header>
-  <h1>🏠 家の在庫管理 <span style="font-size:0.55rem;font-weight:400;color:var(--accent);letter-spacing:0.05em;vertical-align:middle">v1.7.5</span></h1>
+  <h1>🏠 家の在庫管理 <span style="font-size:0.55rem;font-weight:400;color:var(--accent);letter-spacing:0.05em;vertical-align:middle">v1.7.6</span></h1>
   <div style="display:flex;align-items:center;gap:10px">
     <div class="view-toggle">
       <button id="btnList" class="active" onclick="setView('list')" title="リスト表示">☰</button>
@@ -931,6 +963,11 @@
 
   <!-- 設定パネル -->
   <div id="panel-settings" class="panel">
+    <div class="settings-card">
+      <h3>写真から一括追加</h3>
+      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:12px">棚やストック置き場の写真から文字を読み取り、候補を選んでまとめて追加します</p>
+      <button class="btn btn-primary" style="width:100%" onclick="openBatchOcrModal()">📷 写真から候補を作る</button>
+    </div>
     <div class="settings-card">
       <h3>保管場所の管理</h3>
       <div id="categoryList" class="category-list"></div>
@@ -1029,6 +1066,51 @@
     <div class="modal-buttons">
       <button class="btn btn-secondary" onclick="closeItemModal()">キャンセル</button>
       <button class="btn btn-primary" id="saveItemBtn" onclick="saveItem()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 写真から一括追加モーダル -->
+<div id="batchOcrModal" class="modal-overlay">
+  <div class="modal">
+    <h2>写真から一括追加</h2>
+    <div class="form-group">
+      <label>保管場所</label>
+      <select id="batchOcrCategory">
+        <option value="">保管場所を選択</option>
+      </select>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>現在の個数</label>
+        <input type="number" id="batchOcrCurrent" min="0" value="1">
+      </div>
+      <div class="form-group">
+        <label>最低個数</label>
+        <input type="number" id="batchOcrMinimum" min="0" value="1">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>棚の写真</label>
+      <div class="photo-input-wrap">
+        <div class="photo-preview" onclick="document.getElementById('batchOcrPhotoInput').click()">
+          <div class="photo-preview-label" id="batchOcrPhotoLabel">
+            <span>📷</span>写真を選ぶ
+          </div>
+          <img id="batchOcrPhotoPreview" style="display:none">
+        </div>
+        <input type="file" id="batchOcrPhotoInput" accept="image/*" capture="environment" style="display:none" onchange="onBatchOcrPhotoSelected(this)">
+      </div>
+    </div>
+    <button class="btn btn-secondary" id="batchOcrReadBtn" style="width:100%;margin-bottom:14px" onclick="runBatchOCR()" disabled>📖 写真から候補を読み取る</button>
+    <div class="form-group">
+      <label>追加候補</label>
+      <div id="batchOcrStatus" style="font-size:0.82rem;color:var(--muted);margin-bottom:8px">写真を選んでください</div>
+      <div id="batchOcrCandidates" class="ocr-candidate-list"></div>
+    </div>
+    <div class="modal-buttons">
+      <button class="btn btn-secondary" onclick="closeBatchOcrModal()">キャンセル</button>
+      <button class="btn btn-primary" id="batchOcrAddBtn" onclick="addBatchOcrItems()" disabled>選択した項目を追加</button>
     </div>
   </div>
 </div>
@@ -1872,6 +1954,178 @@
     btn.textContent = '📖 写真から商品名・価格を読み取る';
   }
 
+  let batchOcrPhotoData = null;
+  let batchOcrCandidates = [];
+
+  function openBatchOcrModal() {
+    batchOcrPhotoData = null;
+    batchOcrCandidates = [];
+    populateBatchOcrCategorySelect();
+    document.getElementById('batchOcrPhotoInput').value = '';
+    document.getElementById('batchOcrPhotoPreview').src = '';
+    document.getElementById('batchOcrPhotoPreview').style.display = 'none';
+    document.getElementById('batchOcrPhotoLabel').style.display = '';
+    document.getElementById('batchOcrCurrent').value = '1';
+    document.getElementById('batchOcrMinimum').value = '1';
+    document.getElementById('batchOcrReadBtn').disabled = true;
+    document.getElementById('batchOcrReadBtn').textContent = '📖 写真から候補を読み取る';
+    document.getElementById('batchOcrAddBtn').disabled = true;
+    document.getElementById('batchOcrAddBtn').textContent = '選択した項目を追加';
+    document.getElementById('batchOcrStatus').textContent = '写真を選んでください';
+    document.getElementById('batchOcrCandidates').innerHTML = '';
+    document.getElementById('batchOcrModal').classList.add('open');
+  }
+
+  function closeBatchOcrModal() {
+    document.getElementById('batchOcrModal').classList.remove('open');
+  }
+
+  function populateBatchOcrCategorySelect() {
+    const sel = document.getElementById('batchOcrCategory');
+    sel.innerHTML = '<option value="">保管場所を選択</option>' +
+      appData.categories.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('');
+  }
+
+  async function onBatchOcrPhotoSelected(input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    batchOcrPhotoData = await compressImageForOCR(file);
+    const img = document.getElementById('batchOcrPhotoPreview');
+    img.src = batchOcrPhotoData;
+    img.style.display = 'block';
+    document.getElementById('batchOcrPhotoLabel').style.display = 'none';
+    document.getElementById('batchOcrReadBtn').disabled = false;
+    document.getElementById('batchOcrStatus').textContent = '写真を読み取れます';
+  }
+
+  function normalizeItemName(value) {
+    return String(value || '').replace(/\s+/g, '').toLowerCase();
+  }
+
+  function extractBatchOcrCandidates(text) {
+    const seen = new Set();
+    const candidates = [];
+    const ignoreWords = ['税込', '税抜', '価格', '円', 'JAN', 'MADE', '内容量', '成分', '使用方法', '注意', '保存方法'];
+    text.split('\n').forEach(line => {
+      let value = line
+        .replace(/[|｜]/g, ' ')
+        .replace(/[：:]/g, ' ')
+        .replace(/[0-9０-９]+円/g, ' ')
+        .replace(/[¥￥][0-9０-９,]+/g, ' ')
+        .replace(/[^\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}A-Za-z0-9０-９ー・\s]/gu, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      if (value.length < 2 || value.length > 40) return;
+      if (/^[0-9０-９\s-]+$/.test(value)) return;
+      if (ignoreWords.some(word => value.includes(word))) return;
+
+      value = value.replace(/^[0-9０-９\s]+/, '').trim();
+      if (value.length < 2 || value.length > 40) return;
+
+      const key = normalizeItemName(value);
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      candidates.push(value);
+    });
+    return candidates.slice(0, 20);
+  }
+
+  async function runBatchOCR() {
+    if (!batchOcrPhotoData) return;
+    const btn = document.getElementById('batchOcrReadBtn');
+    btn.disabled = true;
+    btn.textContent = '読み取り中...';
+    document.getElementById('batchOcrStatus').textContent = '写真から文字を読み取っています';
+    document.getElementById('batchOcrCandidates').innerHTML = '';
+    document.getElementById('batchOcrAddBtn').disabled = true;
+
+    try {
+      const worker = await Tesseract.createWorker('jpn');
+      const { data: { text } } = await worker.recognize(batchOcrPhotoData);
+      await worker.terminate();
+      batchOcrCandidates = extractBatchOcrCandidates(text);
+      renderBatchOcrCandidates();
+    } catch (error) {
+      batchOcrCandidates = [];
+      document.getElementById('batchOcrStatus').textContent = '読み取りに失敗しました。写真を変えてもう一度試してください';
+    }
+
+    btn.disabled = false;
+    btn.textContent = '📖 写真から候補を読み取る';
+  }
+
+  function renderBatchOcrCandidates() {
+    const container = document.getElementById('batchOcrCandidates');
+    if (batchOcrCandidates.length === 0) {
+      document.getElementById('batchOcrStatus').textContent = '候補が見つかりませんでした。文字が大きく写る写真で試してください';
+      document.getElementById('batchOcrAddBtn').disabled = true;
+      container.innerHTML = '';
+      return;
+    }
+
+    document.getElementById('batchOcrStatus').textContent = `${batchOcrCandidates.length}件の候補が見つかりました。不要なものはチェックを外してください`;
+    document.getElementById('batchOcrAddBtn').disabled = false;
+    container.innerHTML = batchOcrCandidates.map((name, index) => `
+      <label class="ocr-candidate-row">
+        <input type="checkbox" class="batch-ocr-check" data-index="${index}" checked>
+        <input type="text" class="batch-ocr-name" data-index="${index}" value="${escapeHtml(name)}" maxlength="80">
+      </label>
+    `).join('');
+  }
+
+  async function addBatchOcrItems() {
+    const names = Array.from(document.querySelectorAll('.batch-ocr-check'))
+      .filter(check => check.checked)
+      .map(check => {
+        const input = document.querySelector(`.batch-ocr-name[data-index="${check.dataset.index}"]`);
+        return input ? input.value.trim() : '';
+      })
+      .filter(name => name.length > 0 && name.length <= 80);
+
+    const uniqueNames = [];
+    const seen = new Set();
+    names.forEach(name => {
+      const key = normalizeItemName(name);
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      uniqueNames.push(name);
+    });
+
+    if (uniqueNames.length === 0) {
+      document.getElementById('batchOcrStatus').textContent = '追加する候補を選んでください';
+      return;
+    }
+
+    const btn = document.getElementById('batchOcrAddBtn');
+    btn.disabled = true;
+    btn.textContent = '追加中...';
+
+    const categoryId = document.getElementById('batchOcrCategory').value;
+    const current = Math.max(0, Math.min(999, parseInt(document.getElementById('batchOcrCurrent').value) || 1));
+    const minimum = Math.max(0, Math.min(999, parseInt(document.getElementById('batchOcrMinimum').value) || 1));
+    const existingByName = new Map(appData.items.map(item => [normalizeItemName(item.name), item]));
+
+    await Promise.all(uniqueNames.map(name => {
+      const existing = existingByName.get(normalizeItemName(name));
+      if (existing) {
+        return userRef('items/' + existing.id + '/current').set(Math.min(999, (Number(existing.current) || 0) + current));
+      }
+      return userRef('items/' + generateId()).set({
+        name,
+        memo: null,
+        categoryId,
+        current,
+        minimum,
+        refPrice: null,
+        photo: null,
+      });
+    }));
+
+    btn.textContent = '選択した項目を追加';
+    closeBatchOcrModal();
+  }
+
   function compressImage(file) {
     return new Promise(resolve => {
       const reader = new FileReader();
@@ -1886,6 +2140,28 @@
           canvas.width = w; canvas.height = h;
           canvas.getContext('2d').drawImage(img, 0, 0, w, h);
           resolve(canvas.toDataURL('image/jpeg', 0.7));
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function compressImageForOCR(file) {
+    return new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onload = e => {
+        const img = new Image();
+        img.onload = () => {
+          const MAX = 1400;
+          let w = img.width, h = img.height;
+          if (w > h && w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+          else if (h > MAX) { w = Math.round(w * MAX / h); h = MAX; }
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', 0.82));
         };
         img.src = e.target.result;
       };
@@ -2070,6 +2346,9 @@
   });
   document.getElementById('adminItemModal').addEventListener('click', function(e) {
     if (e.target === this) closeAdminItemModal();
+  });
+  document.getElementById('batchOcrModal').addEventListener('click', function(e) {
+    if (e.target === this) closeBatchOcrModal();
   });
   document.getElementById('confirmModal').addEventListener('click', function(e) {
     if (e.target === this) closeConfirmModal();
