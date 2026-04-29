@@ -1029,6 +1029,12 @@
 
   let currentUid = null;
 
+  const ADMIN_UIDS = [
+    'FSMueAKryHa4xZse0RmzeqcNNco1',
+  ];
+
+  const ADMIN_EMAILS = [];
+
   const ALLOWED_UIDS = [
     'FSMueAKryHa4xZse0RmzeqcNNco1',
   ];
@@ -1041,6 +1047,13 @@
     return user && (
       ALLOWED_UIDS.includes(user.uid) ||
       ALLOWED_EMAILS.includes(user.email)
+    );
+  }
+
+  function isAdminUser(user) {
+    return user && (
+      ADMIN_UIDS.includes(user.uid) ||
+      ADMIN_EMAILS.includes(user.email)
     );
   }
 
