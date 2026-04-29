@@ -924,7 +924,7 @@
 </div>
 
 <header>
-  <h1>🏠 家の在庫管理 <span style="font-size:0.55rem;font-weight:400;color:var(--accent);letter-spacing:0.05em;vertical-align:middle">v1.8.1</span></h1>
+  <h1>🏠 家の在庫管理 <span style="font-size:0.55rem;font-weight:400;color:var(--accent);letter-spacing:0.05em;vertical-align:middle">v1.8.2</span></h1>
   <div style="display:flex;align-items:center;gap:10px">
     <div class="view-toggle">
       <button id="btnList" class="active" onclick="setView('list')" title="リスト表示">☰</button>
@@ -1482,10 +1482,14 @@
     document.getElementById('barcodeSearchActions').style.display = 'none';
   }
 
+  function buildRakutenSearchUrl(query) {
+    return `https://search.rakuten.co.jp/search/mall/${encodeURIComponent(query)}/?s=2`;
+  }
+
   function openRakutenSearch() {
     const name = document.getElementById('itemName').value.trim();
     if (!name) { showLookupStatus('⚠️ 商品名を入力してください。', true); return; }
-    window.open(`https://search.rakuten.co.jp/search/mall/${encodeURIComponent(name)}/`, '_blank');
+    window.open(buildRakutenSearchUrl(name), '_blank');
   }
 
   function showBarcodeSearchActions() {
@@ -1503,7 +1507,7 @@
     const encoded = encodeURIComponent(query);
     const urls = {
       google: `https://www.google.com/search?q=${encoded}`,
-      rakuten: `https://search.rakuten.co.jp/search/mall/${encoded}/`,
+      rakuten: buildRakutenSearchUrl(query),
       yahoo: `https://shopping.yahoo.co.jp/search?p=${encoded}`,
     };
     window.open(urls[target] || urls.google, '_blank', 'noopener');
@@ -1910,7 +1914,7 @@
           ${low ? '<span class="low-label">残り少</span>' : ''}
           ${showLocation && locationName ? `<div class="item-location">📍 ${location}</div>` : ''}
           ${item.memo ? `<div class="item-memo">📝 ${memo}</div>` : ''}
-          ${item.refPrice ? `<div class="item-memo">💴 ¥${Number(item.refPrice).toLocaleString()} <a class="rakuten-btn" href="https://search.rakuten.co.jp/search/mall/${encodeURIComponent(item.name)}/" target="_blank" rel="noopener">🛒 楽天で確認</a></div>` : ''}
+          ${item.refPrice ? `<div class="item-memo">💴 ¥${Number(item.refPrice).toLocaleString()} <a class="rakuten-btn" href="${buildRakutenSearchUrl(item.name)}" target="_blank" rel="noopener">🛒 楽天で確認</a></div>` : ''}
         </div>
         <div class="counter">
           <button onclick="changeCount('${itemId}', -1)" ${item.current <= 0 ? 'disabled' : ''}>−</button>
@@ -1945,7 +1949,7 @@
           </div>
           ${locationName ? `<div class="item-location" style="margin-bottom:4px">📍 ${location}</div>` : ''}
           ${item.memo ? `<div class="item-memo" style="margin-bottom:2px">📝 ${memo}</div>` : ''}
-          ${item.refPrice ? `<div class="item-memo" style="margin-bottom:4px">💴 ¥${Number(item.refPrice).toLocaleString()} <a class="rakuten-btn" href="https://search.rakuten.co.jp/search/mall/${encodeURIComponent(item.name)}/" target="_blank" rel="noopener">🛒 楽天</a></div>` : ''}
+          ${item.refPrice ? `<div class="item-memo" style="margin-bottom:4px">💴 ¥${Number(item.refPrice).toLocaleString()} <a class="rakuten-btn" href="${buildRakutenSearchUrl(item.name)}" target="_blank" rel="noopener">🛒 楽天</a></div>` : ''}
           <div class="item-card-counter">
             <div class="counter">
               <button onclick="changeCount('${itemId}', -1)" ${item.current <= 0 ? 'disabled' : ''}>−</button>
