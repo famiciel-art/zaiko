@@ -880,7 +880,7 @@
 </div>
 
 <header>
-  <h1>🏠 家の在庫管理 <span style="font-size:0.55rem;font-weight:400;color:var(--accent);letter-spacing:0.05em;vertical-align:middle">v1.7.3</span></h1>
+  <h1>🏠 家の在庫管理 <span style="font-size:0.55rem;font-weight:400;color:var(--accent);letter-spacing:0.05em;vertical-align:middle">v1.7.5</span></h1>
   <div style="display:flex;align-items:center;gap:10px">
     <div class="view-toggle">
       <button id="btnList" class="active" onclick="setView('list')" title="リスト表示">☰</button>
@@ -1116,7 +1116,6 @@
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://unpkg.com/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 
@@ -1134,7 +1133,6 @@
   };
 
   firebase.initializeApp(firebaseConfig);
-  firebase.appCheck().activate('6LdpD9AsAAAAAKL_I5Hp9XU3OyS5oGXSox6Aqu_k', true);
   const db = firebase.database();
   const auth = firebase.auth();
 
@@ -1143,36 +1141,33 @@
   let currentUid = null;
   let currentUser = null;
 
-  const ADMIN_UIDS = [
-    'FSMueAKryHa4xZse0RmzeqcNNco1',
-  ];
-
-  const ADMIN_EMAILS = [];
-
-  const ALLOWED_UIDS = [
-    'FSMueAKryHa4xZse0RmzeqcNNco1',
-  ];
-
-  const ALLOWED_EMAILS = [
-    'famiciel@gmail.com',
-  ];
-
-  const USER_LABELS = {
-    LjEXNWxCuoZjPv4Y3aHJ5Oh4aLN2: 'famiciel@gmail.com',
+  let accessState = {
+    allowed: false,
+    admin: false,
+    userLabels: {},
   };
 
-  function isAllowedUser(user) {
-    return user && (
-      ALLOWED_UIDS.includes(user.uid) ||
-      ALLOWED_EMAILS.includes(user.email)
-    );
+  async function loadAccessState(user) {
+    const [adminSnap, allowedSnap] = await Promise.all([
+      db.ref('permissions/admins/' + user.uid).once('value'),
+      db.ref('permissions/allowedUsers/' + user.uid).once('value'),
+    ]);
+
+    const admin = adminSnap.val() === true;
+    const allowed = admin || allowedSnap.val() === true;
+    let userLabels = {};
+
+    if (admin) {
+      const labelsSnap = await db.ref('permissions/userLabels').once('value');
+      userLabels = labelsSnap.val() || {};
+    }
+
+    accessState = { allowed, admin, userLabels };
+    return accessState;
   }
 
   function isAdminUser(user) {
-    return user && (
-      ADMIN_UIDS.includes(user.uid) ||
-      ADMIN_EMAILS.includes(user.email)
-    );
+    return !!user && user.uid === currentUid && accessState.admin;
   }
 
   function userRef(path) {
@@ -1186,11 +1181,18 @@
     });
   }
 
-  auth.onAuthStateChanged(user => {
+  auth.onAuthStateChanged(async user => {
     if (user) {
-      if (!isAllowedUser(user)) {
+      let access;
+      try {
+        access = await loadAccessState(user);
+      } catch (error) {
+        access = { allowed: false, admin: false, userLabels: {} };
+      }
+
+      if (!access.allowed) {
         auth.signOut();
-        document.getElementById('loginError').textContent = 'このアカウントはアクセスできません。';
+        document.getElementById('loginError').textContent = 'このアカウントはアクセスできません。管理者にUIDを伝えてください: ' + user.uid;
         document.getElementById('loginError').style.display = 'block';
         return;
       }
@@ -1211,6 +1213,7 @@
       stopDataListeners();
       currentUid = null;
       currentUser = null;
+      accessState = { allowed: false, admin: false, userLabels: {} };
       appData = { categories: [], items: [] };
       adminData = { users: [] };
       selectedAdminUid = null;
@@ -1621,8 +1624,8 @@
     }
 
     const users = [...adminData.users].sort((a, b) => {
-      const aName = (a.profile && (a.profile.email || a.profile.displayName)) || USER_LABELS[a.uid] || a.uid;
-      const bName = (b.profile && (b.profile.email || b.profile.displayName)) || USER_LABELS[b.uid] || b.uid;
+      const aName = (a.profile && (a.profile.email || a.profile.displayName)) || accessState.userLabels[a.uid] || a.uid;
+      const bName = (b.profile && (b.profile.email || b.profile.displayName)) || accessState.userLabels[b.uid] || b.uid;
       return aName.localeCompare(bName, 'ja');
     });
 
@@ -1638,7 +1641,7 @@
 
     usersContainer.innerHTML = `<div class="admin-user-list">${users.map(user => {
       const profile = user.profile || {};
-      const label = profile.email || USER_LABELS[user.uid] || profile.displayName || user.uid;
+      const label = profile.email || accessState.userLabels[user.uid] || profile.displayName || user.uid;
       const itemCount = user.items ? Object.keys(user.items).length : 0;
       const catCount = user.categories ? Object.keys(user.categories).length : 0;
       return `
@@ -1663,7 +1666,7 @@
       : [];
     const getCatName = id => (categories.find(c => c.id === id) || {}).name || '未分類';
     const profile = selected.profile || {};
-    const userLabel = profile.email || USER_LABELS[selected.uid] || profile.displayName || selected.uid;
+    const userLabel = profile.email || accessState.userLabels[selected.uid] || profile.displayName || selected.uid;
 
     dataContainer.innerHTML = `
       <div class="settings-card">
@@ -1711,7 +1714,7 @@
       : [];
     const categoryName = (categories.find(c => c.id === item.categoryId) || {}).name || '未分類';
     const profile = owner.profile || {};
-    const userLabel = profile.email || USER_LABELS[owner.uid] || profile.displayName || owner.uid;
+    const userLabel = profile.email || accessState.userLabels[owner.uid] || profile.displayName || owner.uid;
     const photo = document.getElementById('adminItemPhoto');
     const photoEmpty = document.getElementById('adminItemPhotoEmpty');
 

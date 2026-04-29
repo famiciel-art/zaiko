@@ -2,11 +2,39 @@
   "rules": {
     ".read": false,
     ".write": false,
+    "permissions": {
+      ".read": false,
+      ".write": false,
+      "admins": {
+        "$uid": {
+          ".read": "auth != null && (auth.uid === $uid || root.child('permissions/admins/' + auth.uid).val() === true)",
+          ".write": "auth != null && root.child('permissions/admins/' + auth.uid).val() === true",
+          ".validate": "!newData.exists() || newData.isBoolean()"
+        }
+      },
+      "allowedUsers": {
+        "$uid": {
+          ".read": "auth != null && (auth.uid === $uid || root.child('permissions/admins/' + auth.uid).val() === true)",
+          ".write": "auth != null && root.child('permissions/admins/' + auth.uid).val() === true",
+          ".validate": "!newData.exists() || newData.isBoolean()"
+        }
+      },
+      "userLabels": {
+        ".read": "auth != null && root.child('permissions/admins/' + auth.uid).val() === true",
+        "$uid": {
+          ".write": "auth != null && root.child('permissions/admins/' + auth.uid).val() === true",
+          ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 254)"
+        }
+      },
+      "$other": {
+        ".validate": false
+      }
+    },
     "users": {
-      ".read": "auth != null && auth.uid === 'FSMueAKryHa4xZse0RmzeqcNNco1'",
+      ".read": "auth != null && root.child('permissions/admins/' + auth.uid).val() === true",
       "$uid": {
-        ".read": "auth != null && (auth.uid === 'FSMueAKryHa4xZse0RmzeqcNNco1' || auth.token.email === 'famiciel@gmail.com') && (auth.uid === $uid || auth.uid === 'FSMueAKryHa4xZse0RmzeqcNNco1')",
-        ".write": "auth != null && (auth.uid === 'FSMueAKryHa4xZse0RmzeqcNNco1' || auth.token.email === 'famiciel@gmail.com') && auth.uid === $uid",
+        ".read": "auth != null && (root.child('permissions/allowedUsers/' + auth.uid).val() === true || root.child('permissions/admins/' + auth.uid).val() === true) && (auth.uid === $uid || root.child('permissions/admins/' + auth.uid).val() === true)",
+        ".write": "auth != null && auth.uid === $uid && (root.child('permissions/allowedUsers/' + auth.uid).val() === true || root.child('permissions/admins/' + auth.uid).val() === true)",
         "profile": {
           ".validate": "newData.hasChildren(['lastLoginAt'])",
           "email": {
