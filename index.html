@@ -1033,8 +1033,15 @@
     'FSMueAKryHa4xZse0RmzeqcNNco1',
   ];
 
+  const ALLOWED_EMAILS = [
+    'famiciel@gmail.com',
+  ];
+
   function isAllowedUser(user) {
-    return user && ALLOWED_UIDS.includes(user.uid);
+    return user && (
+      ALLOWED_UIDS.includes(user.uid) ||
+      ALLOWED_EMAILS.includes(user.email)
+    );
   }
 
   function userRef(path) {

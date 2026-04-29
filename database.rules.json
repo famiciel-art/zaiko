@@ -4,8 +4,8 @@
     ".write": false,
     "users": {
       "$uid": {
-        ".read": "auth != null && auth.uid === $uid && auth.uid === 'FSMueAKryHa4xZse0RmzeqcNNco1'",
-        ".write": "auth != null && auth.uid === $uid && auth.uid === 'FSMueAKryHa4xZse0RmzeqcNNco1'"
+        ".read": "auth != null && auth.uid === $uid && (auth.uid === 'FSMueAKryHa4xZse0RmzeqcNNco1' || auth.token.email === 'famiciel@gmail.com')",
+        ".write": "auth != null && auth.uid === $uid && (auth.uid === 'FSMueAKryHa4xZse0RmzeqcNNco1' || auth.token.email === 'famiciel@gmail.com')"
       }
     }
   }
