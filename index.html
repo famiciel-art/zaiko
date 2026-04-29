@@ -293,6 +293,8 @@
       align-items: center;
       justify-content: center;
       padding: 20px;
+      overflow: auto;
+      -webkit-overflow-scrolling: touch;
     }
     .modal-overlay.open { display: flex; }
     .modal {
@@ -302,6 +304,10 @@
       padding: 24px;
       width: 100%;
       max-width: 400px;
+      max-height: calc(100dvh - 40px);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
       box-shadow: 0 0 40px rgba(0,200,255,0.12), 0 8px 32px rgba(0,0,0,0.6);
     }
     .modal h2 {
@@ -343,7 +349,16 @@
     .form-group select option { background: #0a1020; }
     .form-row { display: flex; gap: 12px; }
     .form-row .form-group { flex: 1; }
-    .modal-buttons { display: flex; gap: 10px; margin-top: 20px; }
+    .modal-buttons {
+      display: flex;
+      gap: 10px;
+      margin: 20px -2px -2px;
+      padding-top: 12px;
+      position: sticky;
+      bottom: -24px;
+      background: linear-gradient(to top, rgba(8,16,30,0.98) 70%, rgba(8,16,30,0));
+      z-index: 3;
+    }
     .btn {
       flex: 1;
       padding: 11px;
@@ -669,6 +684,32 @@
     }
 
     /* 検索・並び替えバー */
+    @supports not (height: 100dvh) {
+      .modal {
+        max-height: calc(100vh - 40px);
+      }
+    }
+
+    @media (max-width: 480px) {
+      .modal-overlay {
+        align-items: flex-start;
+        padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom));
+      }
+      .modal {
+        max-height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+        padding: 18px;
+      }
+      .modal-buttons {
+        bottom: -18px;
+        margin-left: -2px;
+        margin-right: -2px;
+        padding-bottom: max(2px, env(safe-area-inset-bottom));
+      }
+      .photo-preview {
+        height: 112px;
+      }
+    }
+
     .search-bar {
       position: sticky;
       top: calc(var(--header-h) + var(--tab-h));
@@ -880,7 +921,7 @@
 </div>
 
 <header>
-  <h1>🏠 家の在庫管理 <span style="font-size:0.55rem;font-weight:400;color:var(--accent);letter-spacing:0.05em;vertical-align:middle">v1.7.9</span></h1>
+  <h1>🏠 家の在庫管理 <span style="font-size:0.55rem;font-weight:400;color:var(--accent);letter-spacing:0.05em;vertical-align:middle">v1.8.0</span></h1>
   <div style="display:flex;align-items:center;gap:10px">
     <div class="view-toggle">
       <button id="btnList" class="active" onclick="setView('list')" title="リスト表示">☰</button>
