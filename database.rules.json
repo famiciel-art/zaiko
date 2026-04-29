@@ -3,6 +3,7 @@
     ".read": false,
     ".write": false,
     "users": {
+      ".read": "auth != null && auth.uid === 'FSMueAKryHa4xZse0RmzeqcNNco1'",
       "$uid": {
         ".read": "auth != null && (auth.uid === 'FSMueAKryHa4xZse0RmzeqcNNco1' || auth.token.email === 'famiciel@gmail.com') && (auth.uid === $uid || auth.uid === 'FSMueAKryHa4xZse0RmzeqcNNco1')",
         ".write": "auth != null && (auth.uid === 'FSMueAKryHa4xZse0RmzeqcNNco1' || auth.token.email === 'famiciel@gmail.com') && auth.uid === $uid"

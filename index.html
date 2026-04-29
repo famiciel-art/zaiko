@@ -114,6 +114,7 @@
     .tab.active { color: var(--accent); }
     .tab.active::after { opacity: 1; }
     .tab:hover:not(.active) { color: var(--text); }
+    .tab.hidden { display: none; }
 
     /* メイン */
     main { padding: 16px; max-width: 600px; margin: 0 auto; }
@@ -446,6 +447,41 @@
       text-transform: uppercase;
     }
     .category-list { }
+
+    .admin-user-list {
+      display: grid;
+      gap: 8px;
+    }
+    .admin-user-btn {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: rgba(0,200,255,0.04);
+      color: var(--text);
+      padding: 10px 12px;
+      text-align: left;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .admin-user-btn:hover,
+    .admin-user-btn.active {
+      border-color: var(--accent);
+      background: rgba(0,200,255,0.1);
+      box-shadow: 0 0 12px rgba(0,200,255,0.12);
+    }
+    .admin-user-name {
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 4px;
+    }
+    .admin-user-meta {
+      font-size: 0.72rem;
+      color: var(--muted);
+      overflow-wrap: anywhere;
+      line-height: 1.5;
+    }
 
     /* スクロールバー */
     ::-webkit-scrollbar { width: 4px; }
@@ -835,10 +871,11 @@
 </header>
 
 <div class="tabs">
-  <button class="tab active" onclick="switchTab('all')">全体</button>
-  <button class="tab" onclick="switchTab('byLocation')">場所別</button>
-  <button class="tab" onclick="switchTab('shopping')">🛒 買い物リスト</button>
-  <button class="tab" onclick="switchTab('settings')">⚙️ 設定</button>
+  <button class="tab active" data-tab="all" onclick="switchTab('all')">全体</button>
+  <button class="tab" data-tab="byLocation" onclick="switchTab('byLocation')">場所別</button>
+  <button class="tab" data-tab="shopping" onclick="switchTab('shopping')">🛒 買い物リスト</button>
+  <button class="tab" data-tab="settings" onclick="switchTab('settings')">⚙️ 設定</button>
+  <button class="tab hidden" data-tab="admin" id="adminTab" onclick="switchTab('admin')">🛡️ 管理</button>
 </div>
 
 <!-- 検索・並び替えバー -->
@@ -895,6 +932,15 @@
       <h3>データ管理</h3>
       <button class="btn btn-danger" style="width:100%" onclick="clearAllData()">すべてのデータを削除する</button>
     </div>
+  </div>
+
+  <!-- 管理者パネル -->
+  <div id="panel-admin" class="panel">
+    <div class="settings-card">
+      <h3>ユーザー別データ確認</h3>
+      <div id="adminUsersContainer"></div>
+    </div>
+    <div id="adminUserDataContainer"></div>
   </div>
 
 </main>
@@ -1028,6 +1074,7 @@
   // ========== 認証 ==========
 
   let currentUid = null;
+  let currentUser = null;
 
   const ADMIN_UIDS = [
     'FSMueAKryHa4xZse0RmzeqcNNco1',
@@ -1084,12 +1131,20 @@
       appData = { categories: [], items: [] };
 
       currentUid = user.uid;
+      currentUser = user;
       document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('adminTab').classList.toggle('hidden', !isAdminUser(user));
+      saveUserProfile(user);
       startDataListeners();
     } else {
       stopDataListeners();
       currentUid = null;
+      currentUser = null;
       appData = { categories: [], items: [] };
+      adminData = { users: [] };
+      selectedAdminUid = null;
+      document.getElementById('adminTab').classList.add('hidden');
+      if (currentTab === 'admin') switchTab('all');
       document.getElementById('loginScreen').style.display = 'flex';
     }
   });
@@ -1102,6 +1157,8 @@
   let sampleChecked = false;
   let listenersStarted = false;
   let dataListenerRefs = [];
+  let adminData = { users: [] };
+  let selectedAdminUid = null;
 
   function snapToArray(snap) {
     const val = snap.val();
@@ -1129,6 +1186,15 @@
     listenersStarted = false;
   }
 
+  function saveUserProfile(user) {
+    userRef('profile').update({
+      email: user.email || null,
+      displayName: user.displayName || null,
+      photoURL: user.photoURL || null,
+      lastLoginAt: firebase.database.ServerValue.TIMESTAMP,
+    });
+  }
+
   function startDataListeners() {
     if (listenersStarted) return;
     listenersStarted = true;
@@ -1136,6 +1202,17 @@
     const categoriesRef = userRef('categories');
     const itemsRef = userRef('items');
     dataListenerRefs = [categoriesRef, itemsRef];
+
+    if (isAdminUser(currentUser)) {
+      const usersRef = db.ref('users');
+      dataListenerRefs.push(usersRef);
+      usersRef.on('value', snap => {
+        const val = snap.val() || {};
+        adminData.users = Object.entries(val).map(([uid, data]) => ({ uid, ...(data || {}) }));
+        if (!selectedAdminUid && adminData.users.length > 0) selectedAdminUid = currentUid;
+        renderAdmin();
+      });
+    }
 
     categoriesRef.on('value', snap => {
       appData.categories = snapToArray(snap);
@@ -1297,15 +1374,15 @@
   let currentTab = 'all';
 
   function switchTab(tab) {
+    if (tab === 'admin' && !isAdminUser(currentUser)) tab = 'all';
     currentTab = tab;
-    document.querySelectorAll('.tab').forEach((t, i) => {
-      const tabs = ['all', 'byLocation', 'shopping', 'settings'];
-      t.classList.toggle('active', tabs[i] === tab);
+    document.querySelectorAll('.tab').forEach(t => {
+      t.classList.toggle('active', t.dataset.tab === tab);
     });
     document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
     document.getElementById('panel-' + tab).classList.add('active');
-    document.getElementById('fabBtn').style.display = (tab === 'settings') ? 'none' : 'flex';
-    document.getElementById('searchBar').classList.toggle('hidden', tab === 'shopping' || tab === 'settings');
+    document.getElementById('fabBtn').style.display = (tab === 'settings' || tab === 'admin') ? 'none' : 'flex';
+    document.getElementById('searchBar').classList.toggle('hidden', tab === 'shopping' || tab === 'settings' || tab === 'admin');
     render();
   }
 
@@ -1320,6 +1397,7 @@
     renderByLocation();
     renderShopping();
     renderSettings();
+    renderAdmin();
     renderBadge();
   }
 
@@ -1453,6 +1531,94 @@
         <button onclick="deleteCategory('${escapeJsArg(cat.id)}')" title="削除">✕</button>
       </span>
     `).join('');
+  }
+
+  function selectAdminUser(uid) {
+    selectedAdminUid = uid;
+    renderAdmin();
+  }
+
+  function renderAdmin() {
+    const usersContainer = document.getElementById('adminUsersContainer');
+    const dataContainer = document.getElementById('adminUserDataContainer');
+    if (!usersContainer || !dataContainer) return;
+
+    if (!isAdminUser(currentUser)) {
+      usersContainer.innerHTML = '<p style="color:var(--muted);font-size:0.85rem">管理者のみ利用できます</p>';
+      dataContainer.innerHTML = '';
+      return;
+    }
+
+    const users = [...adminData.users].sort((a, b) => {
+      const aName = (a.profile && (a.profile.email || a.profile.displayName)) || a.uid;
+      const bName = (b.profile && (b.profile.email || b.profile.displayName)) || b.uid;
+      return aName.localeCompare(bName, 'ja');
+    });
+
+    if (users.length === 0) {
+      usersContainer.innerHTML = '<p style="color:var(--muted);font-size:0.85rem">まだユーザーがありません</p>';
+      dataContainer.innerHTML = '';
+      return;
+    }
+
+    if (!selectedAdminUid || !users.some(u => u.uid === selectedAdminUid)) {
+      selectedAdminUid = users[0].uid;
+    }
+
+    usersContainer.innerHTML = `<div class="admin-user-list">${users.map(user => {
+      const profile = user.profile || {};
+      const label = profile.email || profile.displayName || user.uid;
+      const itemCount = user.items ? Object.keys(user.items).length : 0;
+      const catCount = user.categories ? Object.keys(user.categories).length : 0;
+      return `
+        <button class="admin-user-btn ${user.uid === selectedAdminUid ? 'active' : ''}" onclick="selectAdminUser('${escapeJsArg(user.uid)}')">
+          <div class="admin-user-name">${escapeHtml(label)}${user.uid === currentUid ? '（自分）' : ''}</div>
+          <div class="admin-user-meta">UID: ${escapeHtml(user.uid)}</div>
+          <div class="admin-user-meta">アイテム ${itemCount} 件 / 場所 ${catCount} 件</div>
+        </button>`;
+    }).join('')}</div>`;
+
+    const selected = users.find(u => u.uid === selectedAdminUid);
+    if (!selected) {
+      dataContainer.innerHTML = '';
+      return;
+    }
+
+    const categories = selected.categories
+      ? Object.entries(selected.categories).map(([id, data]) => ({ id, ...(data || {}) }))
+      : [];
+    const items = selected.items
+      ? Object.entries(selected.items).map(([id, data]) => ({ id, ...(data || {}) }))
+      : [];
+    const getCatName = id => (categories.find(c => c.id === id) || {}).name || '未分類';
+    const profile = selected.profile || {};
+    const userLabel = profile.email || profile.displayName || selected.uid;
+
+    dataContainer.innerHTML = `
+      <div class="settings-card">
+        <h3>${escapeHtml(userLabel)} の在庫</h3>
+        ${items.length === 0
+          ? '<div class="empty-state" style="padding:24px 12px"><p>このユーザーのアイテムはまだありません</p></div>'
+          : `<div class="section-card">${items.map(item => renderAdminItemRow(item, getCatName(item.categoryId))).join('')}</div>`
+        }
+      </div>`;
+  }
+
+  function renderAdminItemRow(item, locationName) {
+    const low = isLow(item);
+    return `
+      <div class="item-row ${low ? 'low' : ''}">
+        <div class="item-thumb-placeholder">📦</div>
+        <div class="item-name">
+          ${escapeHtml(item.name)}
+          ${low ? '<span class="low-label">残り少</span>' : ''}
+          <div class="item-location">📍 ${escapeHtml(locationName)}</div>
+          ${item.memo ? `<div class="item-memo">📝 ${escapeHtml(item.memo)}</div>` : ''}
+        </div>
+        <div class="counter">
+          <span class="count-display ${low ? 'low' : ''}">${escapeHtml(item.current)}</span>
+        </div>
+      </div>`;
   }
 
   function renderItemRow(item, locationName, showLocation) {
