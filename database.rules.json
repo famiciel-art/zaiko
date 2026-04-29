@@ -6,7 +6,68 @@
       ".read": "auth != null && auth.uid === 'FSMueAKryHa4xZse0RmzeqcNNco1'",
       "$uid": {
         ".read": "auth != null && (auth.uid === 'FSMueAKryHa4xZse0RmzeqcNNco1' || auth.token.email === 'famiciel@gmail.com') && (auth.uid === $uid || auth.uid === 'FSMueAKryHa4xZse0RmzeqcNNco1')",
-        ".write": "auth != null && (auth.uid === 'FSMueAKryHa4xZse0RmzeqcNNco1' || auth.token.email === 'famiciel@gmail.com') && auth.uid === $uid"
+        ".write": "auth != null && (auth.uid === 'FSMueAKryHa4xZse0RmzeqcNNco1' || auth.token.email === 'famiciel@gmail.com') && auth.uid === $uid",
+        "profile": {
+          ".validate": "newData.hasChildren(['lastLoginAt'])",
+          "email": {
+            ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 254)"
+          },
+          "displayName": {
+            ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 80)"
+          },
+          "photoURL": {
+            ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 500)"
+          },
+          "lastLoginAt": {
+            ".validate": "newData.isNumber() && newData.val() > 0"
+          },
+          "$other": {
+            ".validate": false
+          }
+        },
+        "categories": {
+          "$categoryId": {
+            ".validate": "!newData.exists() || newData.hasChildren(['name'])",
+            "name": {
+              ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 40"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        },
+        "items": {
+          "$itemId": {
+            ".validate": "!newData.exists() || newData.hasChildren(['name', 'categoryId', 'current', 'minimum'])",
+            "name": {
+              ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 80"
+            },
+            "memo": {
+              ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 200)"
+            },
+            "categoryId": {
+              ".validate": "newData.isString() && newData.val().length <= 80"
+            },
+            "current": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 999"
+            },
+            "minimum": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 999"
+            },
+            "refPrice": {
+              ".validate": "!newData.exists() || (newData.isNumber() && newData.val() >= 0 && newData.val() <= 9999999)"
+            },
+            "photo": {
+              ".validate": "!newData.exists() || (newData.isString() && newData.val().matches(/^data:image\\/(jpeg|jpg|png|webp);base64,/) && newData.val().length <= 700000)"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        },
+        "$other": {
+          ".validate": false
+        }
       }
     }
   }
