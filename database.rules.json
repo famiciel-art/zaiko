@@ -93,6 +93,11 @@
             }
           }
         },
+        "barcodeMap": {
+          "$barcode": {
+            ".validate": "($barcode.matches(/^[0-9]{8,14}$/)) && (!newData.exists() || (newData.isString() && newData.val().length >= 1 && newData.val().length <= 80))"
+          }
+        },
         "$other": {
           ".validate": false
         }

@@ -880,7 +880,7 @@
 </div>
 
 <header>
-  <h1>🏠 家の在庫管理 <span style="font-size:0.55rem;font-weight:400;color:var(--accent);letter-spacing:0.05em;vertical-align:middle">v1.7.8</span></h1>
+  <h1>🏠 家の在庫管理 <span style="font-size:0.55rem;font-weight:400;color:var(--accent);letter-spacing:0.05em;vertical-align:middle">v1.7.9</span></h1>
   <div style="display:flex;align-items:center;gap:10px">
     <div class="view-toggle">
       <button id="btnList" class="active" onclick="setView('list')" title="リスト表示">☰</button>
@@ -1394,6 +1394,7 @@
   // ========== バーコードスキャン ==========
 
   let html5QrCode = null;
+  let pendingBarcode = null;
 
   function openScanner() {
     document.getElementById('scannerModal').classList.add('open');
@@ -1464,6 +1465,10 @@
     window.open(urls[target] || urls.google, '_blank', 'noopener');
   }
 
+  function isBarcodeLike(value) {
+    return /^[0-9]{8,14}$/.test(String(value || '').trim());
+  }
+
   function pickProductName(product) {
     if (!product) return '';
     const names = [
@@ -1510,9 +1515,21 @@
   async function lookupBarcode(barcode) {
     const code = String(barcode || '').trim();
     const input = document.getElementById('itemName');
+    pendingBarcode = isBarcodeLike(code) ? code : null;
     input.value = code;
     showLookupStatus('🔍 バーコードから商品名を検索しています...', false);
     input.focus();
+
+    if (pendingBarcode) {
+      const savedSnap = await userRef('barcodeMap/' + pendingBarcode).once('value').catch(() => null);
+      const savedName = savedSnap && savedSnap.val();
+      if (typeof savedName === 'string' && savedName.trim()) {
+        input.value = savedName.trim();
+        document.getElementById('barcodeSearchActions').style.display = 'none';
+        showLookupStatus('✅ 自分の登録履歴から商品名を入力しました。', false);
+        return;
+      }
+    }
 
     const result = await fetchProductByBarcode(code);
     if (result) {
@@ -2039,6 +2056,7 @@
 
   function openAddModal() {
     editingItemId = null;
+    pendingBarcode = null;
     document.getElementById('modalTitle').textContent = 'アイテムを追加';
     document.getElementById('saveItemBtn').textContent = '追加する';
     document.getElementById('itemName').value = '';
@@ -2074,6 +2092,7 @@
 
   function closeItemModal() {
     document.getElementById('itemModal').classList.remove('open');
+    pendingBarcode = null;
     hideLookupStatus();
     resetPhotoPreview();
   }
@@ -2099,6 +2118,9 @@
       userRef('items/' + editingItemId).update(data);
     } else {
       userRef('items/' + generateId()).set(data);
+    }
+    if (pendingBarcode && name !== pendingBarcode) {
+      userRef('barcodeMap/' + pendingBarcode).set(name);
     }
     closeItemModal();
   }
