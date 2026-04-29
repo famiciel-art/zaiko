@@ -880,7 +880,7 @@
 </div>
 
 <header>
-  <h1>🏠 家の在庫管理 <span style="font-size:0.55rem;font-weight:400;color:var(--accent);letter-spacing:0.05em;vertical-align:middle">v1.7.2</span></h1>
+  <h1>🏠 家の在庫管理 <span style="font-size:0.55rem;font-weight:400;color:var(--accent);letter-spacing:0.05em;vertical-align:middle">v1.7.3</span></h1>
   <div style="display:flex;align-items:center;gap:10px">
     <div class="view-toggle">
       <button id="btnList" class="active" onclick="setView('list')" title="リスト表示">☰</button>
@@ -1116,6 +1116,7 @@
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://unpkg.com/tesseract.js@5/dist/tesseract.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 
@@ -1133,6 +1134,7 @@
   };
 
   firebase.initializeApp(firebaseConfig);
+  firebase.appCheck().activate('6LdpD9AsAAAAAKL_I5Hp9XU3OyS5oGXSox6Aqu_k', true);
   const db = firebase.database();
   const auth = firebase.auth();
 
