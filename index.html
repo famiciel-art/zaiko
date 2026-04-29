@@ -1012,13 +1012,13 @@
   // ========== Firebase 初期化 ==========
 
   const firebaseConfig = {
-    apiKey: "AIzaSyC1jk0jir3l2eYyVu6ZYOrgrfDxiLLEflM",
-    authDomain: "zaikokanri2026.firebaseapp.com",
-    databaseURL: "https://zaikokanri2026-default-rtdb.asia-southeast1.firebasedatabase.app",
-    projectId: "zaikokanri2026",
-    storageBucket: "zaikokanri2026.firebasestorage.app",
-    messagingSenderId: "67118745070",
-    appId: "1:67118745070:web:763f1e75dffab192b07aff"
+    apiKey: "AIzaSyAnal_q2F_3ryzTCsZF3gbfnHIR97xO00U",
+    authDomain: "zaikokanri-0429.firebaseapp.com",
+    databaseURL: "https://zaikokanri-0429-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "zaikokanri-0429",
+    storageBucket: "zaikokanri-0429.firebasestorage.app",
+    messagingSenderId: "205474587655",
+    appId: "1:205474587655:web:4297404fb217f4c2e176a2"
   };
 
   firebase.initializeApp(firebaseConfig);
@@ -1034,6 +1034,10 @@
     '9ORYcaXJpsUbBBJNLGiMiMClHPG2',
   ];
 
+  function isAllowedUser(user) {
+    return user && ALLOWED_UIDS.includes(user.uid);
+  }
+
   function userRef(path) {
     return db.ref('users/' + currentUid + '/' + path);
   }
@@ -1047,14 +1051,14 @@
 
   auth.onAuthStateChanged(user => {
     if (user) {
-      if (!ALLOWED_UIDS.includes(user.uid)) {
+      if (!isAllowedUser(user)) {
         auth.signOut();
         document.getElementById('loginError').textContent = 'このアカウントはアクセスできません。';
         document.getElementById('loginError').style.display = 'block';
         return;
       }
       // ユーザーが切り替わったときのためにフラグをリセット
-      listenersStarted = false;
+      stopDataListeners();
       categoriesLoaded = false;
       itemsLoaded = false;
       sampleChecked = false;
@@ -1064,7 +1068,9 @@
       document.getElementById('loginScreen').style.display = 'none';
       startDataListeners();
     } else {
+      stopDataListeners();
       currentUid = null;
+      appData = { categories: [], items: [] };
       document.getElementById('loginScreen').style.display = 'flex';
     }
   });
@@ -1076,6 +1082,7 @@
   let itemsLoaded = false;
   let sampleChecked = false;
   let listenersStarted = false;
+  let dataListenerRefs = [];
 
   function snapToArray(snap) {
     const val = snap.val();
@@ -1083,18 +1090,42 @@
     return Object.entries(val).map(([id, data]) => ({ id, ...data }));
   }
 
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, char => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    }[char]));
+  }
+
+  function escapeJsArg(value) {
+    return escapeHtml(String(value ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'"));
+  }
+
+  function stopDataListeners() {
+    dataListenerRefs.forEach(ref => ref.off());
+    dataListenerRefs = [];
+    listenersStarted = false;
+  }
+
   function startDataListeners() {
     if (listenersStarted) return;
     listenersStarted = true;
 
-    userRef('categories').on('value', snap => {
+    const categoriesRef = userRef('categories');
+    const itemsRef = userRef('items');
+    dataListenerRefs = [categoriesRef, itemsRef];
+
+    categoriesRef.on('value', snap => {
       appData.categories = snapToArray(snap);
       categoriesLoaded = true;
       checkAndAddSampleData();
       render();
     });
 
-    userRef('items').on('value', snap => {
+    itemsRef.on('value', snap => {
       appData.items = snapToArray(snap);
       itemsLoaded = true;
       checkAndAddSampleData();
@@ -1294,7 +1325,7 @@
     const filtered = applySearchAndSort(items);
 
     if (filtered.length === 0) {
-      container.innerHTML = `<div class="empty-state"><div class="icon">🔍</div><p>「${currentSearch}」に一致するアイテムはありません</p></div>`;
+      container.innerHTML = `<div class="empty-state"><div class="icon">🔍</div><p>「${escapeHtml(currentSearch)}」に一致するアイテムはありません</p></div>`;
       return;
     }
 
@@ -1321,10 +1352,11 @@
       const catItems = (searchedItems || items).filter(i => i.categoryId === cat.id);
       if (searchedItems && catItems.length === 0) return;
       const hasLow = catItems.some(isLow);
+      const catName = escapeHtml(cat.name);
       html += `
         <div class="section-card">
           <div class="section-header" onclick="toggleSection(this)">
-            <span>${cat.name} <span style="color:var(--muted);font-weight:normal;font-size:0.8rem">(${catItems.length}品)</span>${hasLow ? ' <span style="color:var(--danger);font-size:0.75rem;text-shadow:0 0 6px rgba(255,63,94,0.6)">● 残り少</span>' : ''}</span>
+            <span>${catName} <span style="color:var(--muted);font-weight:normal;font-size:0.8rem">(${catItems.length}品)</span>${hasLow ? ' <span style="color:var(--danger);font-size:0.75rem;text-shadow:0 0 6px rgba(255,63,94,0.6)">● 残り少</span>' : ''}</span>
             <span class="arrow">▼</span>
           </div>
           <div class="section-body">
@@ -1374,13 +1406,13 @@
         ${lowItems.map(item => `
           <div class="item-row low">
             <div class="item-name">
-              ${item.name}
-              <div class="item-location">📍 ${getCatName(item.categoryId)}</div>
+              ${escapeHtml(item.name)}
+              <div class="item-location">📍 ${escapeHtml(getCatName(item.categoryId))}</div>
             </div>
             <div class="counter">
-              <button onclick="changeCount('${item.id}', -1)" ${item.current <= 0 ? 'disabled' : ''}>−</button>
-              <span class="count-display low">${item.current}</span>
-              <button onclick="changeCount('${item.id}', 1)">＋</button>
+              <button onclick="changeCount('${escapeJsArg(item.id)}', -1)" ${item.current <= 0 ? 'disabled' : ''}>−</button>
+              <span class="count-display low">${escapeHtml(item.current)}</span>
+              <button onclick="changeCount('${escapeJsArg(item.id)}', 1)">＋</button>
             </div>
           </div>
         `).join('')}
@@ -1398,65 +1430,77 @@
 
     container.innerHTML = categories.map(cat => `
       <span class="category-chip">
-        ${cat.name}
-        <button onclick="deleteCategory('${cat.id}')" title="削除">✕</button>
+        ${escapeHtml(cat.name)}
+        <button onclick="deleteCategory('${escapeJsArg(cat.id)}')" title="削除">✕</button>
       </span>
     `).join('');
   }
 
   function renderItemRow(item, locationName, showLocation) {
     const low = isLow(item);
+    const itemId = escapeJsArg(item.id);
+    const itemName = escapeHtml(item.name);
+    const itemNameArg = escapeJsArg(item.name);
+    const memo = escapeHtml(item.memo);
+    const location = escapeHtml(locationName);
+    const photoUrl = escapeHtml(item.photo);
     const thumb = item.photo
-      ? `<img class="item-thumb clickable-photo" src="${item.photo}" alt="" onclick="openPhotoLightbox('${item.photo}','${item.name.replace(/'/g,'&#39;')}')">`
+      ? `<img class="item-thumb clickable-photo" src="${photoUrl}" alt="" onclick="openPhotoLightbox('${escapeJsArg(item.photo)}','${itemNameArg}')">`
       : `<div class="item-thumb-placeholder">📦</div>`;
     return `
       <div class="item-row ${low ? 'low' : ''}">
         ${thumb}
         <div class="item-name">
-          ${item.name}
+          ${itemName}
           ${low ? '<span class="low-label">残り少</span>' : ''}
-          ${showLocation && locationName ? `<div class="item-location">📍 ${locationName}</div>` : ''}
-          ${item.memo ? `<div class="item-memo">📝 ${item.memo}</div>` : ''}
+          ${showLocation && locationName ? `<div class="item-location">📍 ${location}</div>` : ''}
+          ${item.memo ? `<div class="item-memo">📝 ${memo}</div>` : ''}
           ${item.refPrice ? `<div class="item-memo">💴 ¥${Number(item.refPrice).toLocaleString()} <a class="rakuten-btn" href="https://search.rakuten.co.jp/search/mall/${encodeURIComponent(item.name)}/" target="_blank" rel="noopener">🛒 楽天で確認</a></div>` : ''}
         </div>
         <div class="counter">
-          <button onclick="changeCount('${item.id}', -1)" ${item.current <= 0 ? 'disabled' : ''}>−</button>
-          <span class="count-display ${low ? 'low' : ''}">${item.current}</span>
-          <button onclick="changeCount('${item.id}', 1)">＋</button>
+          <button onclick="changeCount('${itemId}', -1)" ${item.current <= 0 ? 'disabled' : ''}>−</button>
+          <span class="count-display ${low ? 'low' : ''}">${escapeHtml(item.current)}</span>
+          <button onclick="changeCount('${itemId}', 1)">＋</button>
         </div>
         <div class="item-actions">
-          <button class="btn-icon" onclick="openEditModal('${item.id}')" title="編集">✏️</button>
-          <button class="btn-icon" onclick="confirmDeleteItem('${item.id}')" title="削除">🗑️</button>
+          <button class="btn-icon" onclick="openEditModal('${itemId}')" title="編集">✏️</button>
+          <button class="btn-icon" onclick="confirmDeleteItem('${itemId}')" title="削除">🗑️</button>
         </div>
       </div>`;
   }
 
   function renderItemCard(item, locationName) {
     const low = isLow(item);
+    const itemId = escapeJsArg(item.id);
+    const itemName = escapeHtml(item.name);
+    const itemNameArg = escapeJsArg(item.name);
+    const memo = escapeHtml(item.memo);
+    const location = escapeHtml(locationName);
+    const photoUrl = escapeHtml(item.photo);
     const photo = item.photo
-      ? `<img class="item-card-photo clickable-photo" src="${item.photo}" alt="" onclick="openPhotoLightbox('${item.photo}','${item.name.replace(/'/g,'&#39;')}')">`
+      ? `<img class="item-card-photo clickable-photo" src="${photoUrl}" alt="" onclick="openPhotoLightbox('${escapeJsArg(item.photo)}','${itemNameArg}')">`
       : `<div class="item-card-photo-placeholder">📦</div>`;
     return `
       <div class="item-card ${low ? 'low' : ''}">
         ${photo}
         <div class="item-card-body">
           <div class="item-card-name">
-            ${item.name}
+            ${itemName}
             ${low ? '<span class="low-label">残り少</span>' : ''}
           </div>
-          ${locationName ? `<div class="item-location" style="margin-bottom:4px">📍 ${locationName}</div>` : ''}
-          ${item.memo ? `<div class="item-memo" style="margin-bottom:2px">📝 ${item.memo}</div>` : ''}
+          ${locationName ? `<div class="item-location" style="margin-bottom:4px">📍 ${location}</div>` : ''}
+          ${item.memo ? `<div class="item-memo" style="margin-bottom:2px">📝 ${memo}</div>` : ''}
           ${item.refPrice ? `<div class="item-memo" style="margin-bottom:4px">💴 ¥${Number(item.refPrice).toLocaleString()} <a class="rakuten-btn" href="https://search.rakuten.co.jp/search/mall/${encodeURIComponent(item.name)}/" target="_blank" rel="noopener">🛒 楽天</a></div>` : ''}
           <div class="item-card-counter">
             <div class="counter">
-              <button onclick="changeCount('${item.id}', -1)" ${item.current <= 0 ? 'disabled' : ''}>−</button>
-              <span class="count-display ${low ? 'low' : ''}">${item.current}</span>
-              <button onclick="changeCount('${item.id}', 1)">＋</button>
+              <button onclick="changeCount('${itemId}', -1)" ${item.current <= 0 ? 'disabled' : ''}>−</button>
+              <span class="count-display ${low ? 'low' : ''}">${escapeHtml(item.current)}</span>
+              <button onclick="changeCount('${itemId}', 1)">＋</button>
             </div>
           </div>
           <div class="item-card-actions">
-            <button class="btn-icon" onclick="openEditModal('${item.id}')" title="編集">✏️</button>
-            <button class="btn-icon" onclick="confirmDeleteItem('${item.id}')" title="削除">🗑️</button>
+            <button class="btn-icon" onclick="openEditModal('${itemId}')" title="編集">✏️</button>
+            <button class="btn-icon" onclick="confirmDeleteItem('${itemId}')" title="削除">🗑️</button>
           </div>
         </div>
       </div>`;
@@ -1596,7 +1640,7 @@
     const { categories } = appData;
     const sel = document.getElementById('itemCategory');
     sel.innerHTML = '<option value="">保管場所を選択</option>' +
-      categories.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+      categories.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name)}</option>`).join('');
   }
 
   function openAddModal() {
