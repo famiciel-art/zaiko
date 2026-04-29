@@ -880,7 +880,7 @@
 </div>
 
 <header>
-  <h1>🏠 家の在庫管理 <span style="font-size:0.55rem;font-weight:400;color:var(--accent);letter-spacing:0.05em;vertical-align:middle">v1.7.7</span></h1>
+  <h1>🏠 家の在庫管理 <span style="font-size:0.55rem;font-weight:400;color:var(--accent);letter-spacing:0.05em;vertical-align:middle">v1.7.8</span></h1>
   <div style="display:flex;align-items:center;gap:10px">
     <div class="view-toggle">
       <button id="btnList" class="active" onclick="setView('list')" title="リスト表示">☰</button>
@@ -979,6 +979,11 @@
       </label>
       <input type="text" id="itemName" placeholder="例：シャンプー" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:7px;font-size:0.92rem;outline:none;font-family:inherit;background:rgba(0,200,255,0.04);color:var(--text)">
       <div id="lookupStatus" style="display:none;margin-top:6px;font-size:0.78rem;padding:6px 10px;border-radius:5px;"></div>
+      <div id="barcodeSearchActions" style="display:none;margin-top:8px;gap:8px;grid-template-columns:repeat(3,1fr)">
+        <button class="btn-small" type="button" onclick="openBarcodeWebSearch('google')">Google</button>
+        <button class="btn-small" type="button" onclick="openBarcodeWebSearch('rakuten')">楽天</button>
+        <button class="btn-small" type="button" onclick="openBarcodeWebSearch('yahoo')">Yahoo</button>
+      </div>
     </div>
     <div class="form-group">
       <label>メモ（任意）</label>
@@ -1429,12 +1434,34 @@
 
   function hideLookupStatus() {
     document.getElementById('lookupStatus').style.display = 'none';
+    document.getElementById('barcodeSearchActions').style.display = 'none';
   }
 
   function openRakutenSearch() {
     const name = document.getElementById('itemName').value.trim();
     if (!name) { showLookupStatus('⚠️ 商品名を入力してください。', true); return; }
     window.open(`https://search.rakuten.co.jp/search/mall/${encodeURIComponent(name)}/`, '_blank');
+  }
+
+  function showBarcodeSearchActions() {
+    const actions = document.getElementById('barcodeSearchActions');
+    actions.style.display = 'grid';
+  }
+
+  function openBarcodeWebSearch(target) {
+    const query = document.getElementById('itemName').value.trim();
+    if (!query) {
+      showLookupStatus('⚠️ バーコード番号がありません。', true);
+      return;
+    }
+
+    const encoded = encodeURIComponent(query);
+    const urls = {
+      google: `https://www.google.com/search?q=${encoded}`,
+      rakuten: `https://search.rakuten.co.jp/search/mall/${encoded}/`,
+      yahoo: `https://shopping.yahoo.co.jp/search?p=${encoded}`,
+    };
+    window.open(urls[target] || urls.google, '_blank', 'noopener');
   }
 
   function pickProductName(product) {
@@ -1490,11 +1517,13 @@
     const result = await fetchProductByBarcode(code);
     if (result) {
       input.value = result.productName;
+      document.getElementById('barcodeSearchActions').style.display = 'none';
       showLookupStatus(`✅ ${result.source} から商品名を取得しました。名前を確認して保存してください。`, false);
       return;
     }
 
-    showLookupStatus('⚠️ 商品名が見つかりませんでした。バーコード番号を残したので、商品名を手入力してください。', true);
+    showLookupStatus('⚠️ 商品DBでは見つかりませんでした。下のボタンでバーコード番号をネット検索できます。', true);
+    showBarcodeSearchActions();
   }
 
   // ========== タブ切り替え ==========
