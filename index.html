@@ -860,7 +860,7 @@
 </div>
 
 <header>
-  <h1>🏠 家の在庫管理 <span style="font-size:0.55rem;font-weight:400;color:var(--muted);letter-spacing:0.05em;vertical-align:middle">v1.7.0</span></h1>
+  <h1>🏠 家の在庫管理 <span style="font-size:0.55rem;font-weight:400;color:var(--accent);letter-spacing:0.05em;vertical-align:middle">v1.7.1</span></h1>
   <div style="display:flex;align-items:center;gap:10px">
     <div class="view-toggle">
       <button id="btnList" class="active" onclick="setView('list')" title="リスト表示">☰</button>
@@ -1089,6 +1089,10 @@
   const ALLOWED_EMAILS = [
     'famiciel@gmail.com',
   ];
+
+  const USER_LABELS = {
+    LjEXNWxCuoZjPv4Y3aHJ5Oh4aLN2: 'famiciel@gmail.com',
+  };
 
   function isAllowedUser(user) {
     return user && (
@@ -1550,8 +1554,8 @@
     }
 
     const users = [...adminData.users].sort((a, b) => {
-      const aName = (a.profile && (a.profile.email || a.profile.displayName)) || a.uid;
-      const bName = (b.profile && (b.profile.email || b.profile.displayName)) || b.uid;
+      const aName = (a.profile && (a.profile.email || a.profile.displayName)) || USER_LABELS[a.uid] || a.uid;
+      const bName = (b.profile && (b.profile.email || b.profile.displayName)) || USER_LABELS[b.uid] || b.uid;
       return aName.localeCompare(bName, 'ja');
     });
 
@@ -1567,7 +1571,7 @@
 
     usersContainer.innerHTML = `<div class="admin-user-list">${users.map(user => {
       const profile = user.profile || {};
-      const label = profile.email || profile.displayName || user.uid;
+      const label = profile.email || USER_LABELS[user.uid] || profile.displayName || user.uid;
       const itemCount = user.items ? Object.keys(user.items).length : 0;
       const catCount = user.categories ? Object.keys(user.categories).length : 0;
       return `
@@ -1592,7 +1596,7 @@
       : [];
     const getCatName = id => (categories.find(c => c.id === id) || {}).name || '未分類';
     const profile = selected.profile || {};
-    const userLabel = profile.email || profile.displayName || selected.uid;
+    const userLabel = profile.email || USER_LABELS[selected.uid] || profile.displayName || selected.uid;
 
     dataContainer.innerHTML = `
       <div class="settings-card">
