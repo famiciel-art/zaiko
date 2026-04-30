@@ -358,6 +358,47 @@
     .form-group select option { background: #0a1020; }
     .form-row { display: flex; gap: 12px; }
     .form-row .form-group { flex: 1; }
+    .form-number-stepper {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+    }
+    .form-number-stepper input {
+      flex: 1;
+      min-width: 0;
+      text-align: center;
+      font-weight: 700;
+      color: var(--accent2);
+    }
+    .form-number-stepper input::-webkit-outer-spin-button,
+    .form-number-stepper input::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    .form-number-stepper input[type="number"] {
+      -moz-appearance: textfield;
+    }
+    .form-number-stepper button {
+      width: 38px;
+      height: 38px;
+      flex: 0 0 38px;
+      border-radius: 8px;
+      border: 1px solid var(--accent);
+      background: rgba(0,200,255,0.07);
+      color: var(--accent);
+      font-size: 1.15rem;
+      font-weight: 700;
+      line-height: 1;
+      cursor: pointer;
+      font-family: inherit;
+      box-shadow: 0 0 10px rgba(0,200,255,0.12);
+      touch-action: manipulation;
+    }
+    .form-number-stepper button:active {
+      transform: scale(0.96);
+      background: rgba(0,200,255,0.16);
+    }
     .modal-buttons {
       display: flex;
       gap: 10px;
@@ -933,7 +974,7 @@
 </div>
 
 <header>
-  <h1>🏠 家の在庫管理 <span style="font-size:0.55rem;font-weight:400;color:var(--accent);letter-spacing:0.05em;vertical-align:middle">v1.8.3</span></h1>
+  <h1>🏠 家の在庫管理 <span style="font-size:0.55rem;font-weight:400;color:var(--accent);letter-spacing:0.05em;vertical-align:middle">v1.8.4</span></h1>
   <div style="display:flex;align-items:center;gap:10px">
     <div class="view-toggle">
       <button id="btnList" class="active" onclick="setView('list')" title="リスト表示">☰</button>
@@ -1051,11 +1092,19 @@
     <div class="form-row">
       <div class="form-group">
         <label>現在の個数</label>
-        <input type="number" id="itemCurrent" min="0" value="1">
+        <div class="form-number-stepper">
+          <button type="button" onclick="adjustModalNumber('itemCurrent', -1)" aria-label="現在の個数を減らす">−</button>
+          <input type="number" id="itemCurrent" min="0" value="1" inputmode="numeric" pattern="[0-9]*">
+          <button type="button" onclick="adjustModalNumber('itemCurrent', 1)" aria-label="現在の個数を増やす">＋</button>
+        </div>
       </div>
       <div class="form-group">
         <label>最低個数 <span style="font-weight:normal;color:#888;font-size:0.8rem">（これ以下で警告）</span></label>
-        <input type="number" id="itemMinimum" min="0" value="1">
+        <div class="form-number-stepper">
+          <button type="button" onclick="adjustModalNumber('itemMinimum', -1)" aria-label="最低個数を減らす">−</button>
+          <input type="number" id="itemMinimum" min="0" value="1" inputmode="numeric" pattern="[0-9]*">
+          <button type="button" onclick="adjustModalNumber('itemMinimum', 1)" aria-label="最低個数を増やす">＋</button>
+        </div>
       </div>
     </div>
     <div class="form-group">
@@ -2176,6 +2225,17 @@
       userRef('barcodeMap/' + pendingBarcode).set(name);
     }
     closeItemModal();
+  }
+
+  function adjustModalNumber(inputId, delta) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+
+    const min = Number.parseInt(input.min, 10);
+    const lowerLimit = Number.isNaN(min) ? 0 : min;
+    const current = Number.parseInt(input.value, 10);
+    const base = Number.isNaN(current) ? lowerLimit : current;
+    input.value = String(Math.max(lowerLimit, base + delta));
   }
 
   function changeCount(id, delta) {
