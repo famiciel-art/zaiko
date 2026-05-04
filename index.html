@@ -974,7 +974,7 @@
 </div>
 
 <header>
-  <h1>🏠 家の在庫管理 <span style="font-size:0.55rem;font-weight:400;color:var(--accent);letter-spacing:0.05em;vertical-align:middle">v1.8.4</span></h1>
+  <h1>🏠 家の在庫管理 <span style="font-size:0.55rem;font-weight:400;color:var(--accent);letter-spacing:0.05em;vertical-align:middle">v1.8.5</span></h1>
   <div style="display:flex;align-items:center;gap:10px">
     <div class="view-toggle">
       <button id="btnList" class="active" onclick="setView('list')" title="リスト表示">☰</button>
@@ -1249,19 +1249,13 @@
   let currentUser = null;
 
   let accessState = {
-    allowed: false,
     admin: false,
     userLabels: {},
   };
 
   async function loadAccessState(user) {
-    const [adminSnap, allowedSnap] = await Promise.all([
-      db.ref('permissions/admins/' + user.uid).once('value'),
-      db.ref('permissions/allowedUsers/' + user.uid).once('value'),
-    ]);
-
+    const adminSnap = await db.ref('permissions/admins/' + user.uid).once('value');
     const admin = adminSnap.val() === true;
-    const allowed = admin || allowedSnap.val() === true;
     let userLabels = {};
 
     if (admin) {
@@ -1269,7 +1263,7 @@
       userLabels = labelsSnap.val() || {};
     }
 
-    accessState = { allowed, admin, userLabels };
+    accessState = { admin, userLabels };
     return accessState;
   }
 
@@ -1294,14 +1288,7 @@
       try {
         access = await loadAccessState(user);
       } catch (error) {
-        access = { allowed: false, admin: false, userLabels: {} };
-      }
-
-      if (!access.allowed) {
-        auth.signOut();
-        document.getElementById('loginError').textContent = 'このアカウントはアクセスできません。管理者にUIDを伝えてください: ' + user.uid;
-        document.getElementById('loginError').style.display = 'block';
-        return;
+        access = { admin: false, userLabels: {} };
       }
       // ユーザーが切り替わったときのためにフラグをリセット
       stopDataListeners();
@@ -1320,7 +1307,7 @@
       stopDataListeners();
       currentUid = null;
       currentUser = null;
-      accessState = { allowed: false, admin: false, userLabels: {} };
+      accessState = { admin: false, userLabels: {} };
       appData = { categories: [], items: [] };
       adminData = { users: [] };
       selectedAdminUid = null;
